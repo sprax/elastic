@@ -1,2 +1,2 @@
 # elastic
-learning elasticsearch
+learning Elasticsearch
