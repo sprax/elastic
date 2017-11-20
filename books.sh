@@ -29,7 +29,7 @@ curl -s -XPOST $ADDRESS/$BOOKS/book/_bulk -d'
 
 # GET /bookdb_index/book/_search?q=title:in action
 # GET /bookdb_index/book/_search?q=guide =====>  http://localhost:9200/bookdb_index/book/_search/?pretty=true&q=guide
-curl -s -XGET $ADDRESS/$BOOKS/book/_search -d '
+curl -s -XGET $ADDRESS/$BOOKS/book/_search?pretty -d '
 {
     "query": {
         "multi_match" : {
@@ -41,7 +41,9 @@ curl -s -XGET $ADDRESS/$BOOKS/book/_search -d '
 '
 
 # Full body DSL
-curl -s -XPOST $ADDRESS/$BOOKS/book/_search -d '
+# Browser: http://localhost:9200/bookdb_index/book/_search/?pretty=true&q=title:in%20action
+# URL = "http://$ADDRESS/$BOOKS/book/_search/?q=title:in%20action"
+curl -s -XPOST $ADDRESS/$BOOKS/book/_search?pretty -d '
 {
     "query": {
         "match" : {
@@ -60,8 +62,7 @@ curl -s -XPOST $ADDRESS/$BOOKS/book/_search -d '
 '
 
 # Multi-field
-
-curl -s -XPOST $ADDRESS/$BOOKS/book/_search -d '
+curl -s -XPOST $ADDRESS/$BOOKS/book/_search?pretty -d '
 {
     "query": {
         "multi_match" : {
@@ -70,9 +71,18 @@ curl -s -XPOST $ADDRESS/$BOOKS/book/_search -d '
         }
     }
 }
-''
+'
 
+# Boosting
+curl -s -XPOST $ADDRESS/$BOOKS/book/_search?pretty -d '
+{
+    "query": {
+        "multi_match" : {
+            "query" : "elasticsearch guide",
+            "fields": ["title", "summary^3"]
+        }
+    },
+    "_source": ["title", "summary", "publish_date"]
+}
+'
 
-
-# Browser: http://localhost:9200/bookdb_index/book/_search/?pretty=true&q=title:in%20action
-# URL = "http://$ADDRESS/$BOOKS/book/_search/?q=title:in%20action"
