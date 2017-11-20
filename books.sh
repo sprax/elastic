@@ -27,8 +27,8 @@ curl -s -XPOST $ADDRESS/$BOOKS/book/_bulk -d'
     { "title": "Solr in Action", "authors": ["trey grainger", "timothy potter"], "summary" : "Comprehensive guide to implementing a scalable search engine using Apache Solr", "publish_date" : "2014-04-05", "num_reviews": 23, "publisher": "manning" }
 '
 
-# Browser: http://localhost:9200/bookdb_index/book/_search/?q=title:in%20action
-# URL = "http://$ADDRESS/$BOOKS/book/_search/?q=title:in%20action"
+# GET /bookdb_index/book/_search?q=title:in action
+# GET /bookdb_index/book/_search?q=guide =====>  http://localhost:9200/bookdb_index/book/_search/?pretty=true&q=guide
 curl -s -XGET $ADDRESS/$BOOKS/book/_search -d '
 {
     "query": {
@@ -39,3 +39,40 @@ curl -s -XGET $ADDRESS/$BOOKS/book/_search -d '
     }
 }
 '
+
+# Full body DSL
+curl -s -XPOST $ADDRESS/$BOOKS/book/_search -d '
+{
+    "query": {
+        "match" : {
+            "title" : "in action"
+        }
+    },
+    "size": 2,
+    "from": 0,
+    "_source": [ "title", "summary", "publish_date" ],
+    "highlight": {
+        "fields" : {
+            "title" : {}
+        }
+    }
+}
+'
+
+# Multi-field
+
+curl -s -XPOST $ADDRESS/$BOOKS/book/_search -d '
+{
+    "query": {
+        "multi_match" : {
+            "query" : "elasticsearch guide",
+            "fields": ["title", "summary"]
+        }
+    }
+}
+''
+
+
+
+# Browser: http://localhost:9200/bookdb_index/book/_search/?pretty=true&q=title:in%20action
+# URL = "http://$ADDRESS/$BOOKS/book/_search/?q=title:in%20action"
