@@ -59,4 +59,5 @@ fi
 # Rest of the program here.
 # If there are input files (for example) that follow the options, they
 # will remain in the "$@" positional parameters.
+echo "file is ($file)"
 

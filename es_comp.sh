@@ -7,7 +7,7 @@ def_field1=${2:-description}
 def_field2=${3:-name}
 def_operat=${4:-AND}
 analyzer_1=${5:-standard}
-do_explain=${6:-true}
+do_explain=${6:-false}
 
 gen_data()
 {
@@ -18,8 +18,9 @@ cat <<EOF
             "must":     { "match": { "name": "Elasticsearch" }},
             "must_not": { "match": { "description": "Francisco"  }},
             "should": [
-                        { "match": { "title": "brown" }},
-                        { "match": { "title": "dog"   }}
+                { "match": { "description": "Elasticsearch" }},
+                { "match": { "organizer": "brown" }},
+                { "match": { "tags": "big data"   }}
             ]
         }
     },
