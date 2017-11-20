@@ -1,13 +1,13 @@
-BOOKS#!/usr/bin/env bash
-  
+#!/usr/bin/env bash
+# See https://dzone.com/articles/23-useful-elasticsearch-example-queries
+
 ADDRESS=$1
+BOOKS="bookdb_index"
 
 if [ -z $ADDRESS ]; then
   ADDRESS="localhost:9200"
 fi
 
-
-BOOKS="bookdb_index"
 
 curl -s -XPUT $ADDRESS/$BOOKS -d '{ "settings": { "number_of_shards": 1 }}'
 
@@ -16,8 +16,7 @@ curl -s "$ADDRESS/$BOOKS/_health?wait_for_status=yellow&timeout=10s" > /dev/null
 echo
 echo "Done creating '$BOOKS' index."
 
-curl -s -XPOST $ADDRESS/$BOOKS -d'
-/$BOOKS/book/_bulk
+curl -s -XPOST $ADDRESS/$BOOKS/book/_bulk -d'
     { "index": { "_id": 1 }}
     { "title": "Elasticsearch: The Definitive Guide", "authors": ["clinton gormley", "zachary tong"], "summary" : "A distibuted real-time search and analytics engine", "publish_date" : "2015-02-07", "num_reviews": 20, "publisher": "oreilly" }
     { "index": { "_id": 2 }}
@@ -26,4 +25,17 @@ curl -s -XPOST $ADDRESS/$BOOKS -d'
     { "title": "Elasticsearch in Action", "authors": ["radu gheorge", "matthew lee hinman", "roy russo"], "summary" : "build scalable search applications using Elasticsearch without having to do complex low-level programming or understand advanced data science algorithms", "publish_date" : "2015-12-03", "num_reviews": 18, "publisher": "manning" }
     { "index": { "_id": 4 }}
     { "title": "Solr in Action", "authors": ["trey grainger", "timothy potter"], "summary" : "Comprehensive guide to implementing a scalable search engine using Apache Solr", "publish_date" : "2014-04-05", "num_reviews": 23, "publisher": "manning" }
+'
+
+# Browser: http://localhost:9200/bookdb_index/book/_search/?q=title:in%20action
+# URL = "http://$ADDRESS/$BOOKS/book/_search/?q=title:in%20action"
+curl -s -XGET $ADDRESS/$BOOKS/book/_search -d '
+{
+    "query": {
+        "multi_match" : {
+            "query" : "guide",
+            "fields" : ["_all"]
+        }
+    }
+}
 '
