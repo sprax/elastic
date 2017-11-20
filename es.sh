@@ -1,4 +1,4 @@
-#!/usr/bin/sh
+#!/usr/local/bin/bash
 # See: https://stackoverflow.com/questions/17029902/using-curl-post-with-variables-defined-in-bash-script-functions
 
 query_type=${1:-query_string}

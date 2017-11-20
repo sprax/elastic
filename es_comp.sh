@@ -13,18 +13,17 @@ gen_data()
 {
 cat <<EOF
 {
-  "query": {
-    "bool": {
-      "must":     { "match": { "name": "Elasticsearch" }},
-      "must_not": { "match": { "description": "Francisco"  }},
-      "should": [
-                  { "match": { "title": "brown" }},
-                  { "match": { "title": "dog"   }}
-      ]
-    }
-  },
-  "explain" : "$do_explain"
-}
+    "query": {
+        "bool": {
+            "must":     { "match": { "name": "Elasticsearch" }},
+            "must_not": { "match": { "description": "Francisco"  }},
+            "should": [
+                        { "match": { "title": "brown" }},
+                        { "match": { "title": "dog"   }}
+            ]
+        }
+    },
+    "explain" : "$do_explain"
 }
 EOF
 } 
