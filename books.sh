@@ -27,6 +27,9 @@ curl -s -XPOST $ADDRESS/$BOOKS/book/_bulk -d'
     { "title": "Solr in Action", "authors": ["trey grainger", "timothy potter"], "summary" : "Comprehensive guide to implementing a scalable search engine using Apache Solr", "publish_date" : "2014-04-05", "num_reviews": 23, "publisher": "manning" }
 '
 
+# TO SEE THE MAPPING FOR THIS INDEX:
+curl -XGET http://localhost:9200/$BOOKS/book/_mapping?pretty
+
 # GET /bookdb_index/book/_search?q=title:in action
 # GET /bookdb_index/book/_search?q=guide =====>  http://localhost:9200/bookdb_index/book/_search/?pretty=true&q=guide
 curl -s -XGET $ADDRESS/$BOOKS/book/_search?pretty -d '
