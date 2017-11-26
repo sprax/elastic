@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# See https://dzone.com/articles/23-useful-elasticsearch-example-queries
 
 ADDRESS=$1
 BOOKS="bookdb_index"
