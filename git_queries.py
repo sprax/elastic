@@ -25,12 +25,12 @@ def print_hits(results):
     print('=' * 80)
     print()
 
-def empty_search():
+def empty_search(es):
     print('Empty search:')
     print_hits(es.search(index='git'))
 
 
-def find_term(term):
+def find_term(es, term):
     print('Find commits that contain term="%s" without touching tests:' % term)
     result = es.search(
         index='git',
@@ -50,7 +50,7 @@ def find_term(term):
     )
     print_hits(result)
 
-def latest_commits(count):
+def latest_commits(es, count):
     print('Last %d Commits for elasticsearch-py:' % count)
     result = es.search(
         index='git',
@@ -69,7 +69,7 @@ def latest_commits(count):
     )
     print_hits(result)
 
-def last_committer_stats(count):
+def last_committer_stats(es, count):
     '''FIXME: using default size'''
     print('Stats for top %d committers:' % count)
     result = es.search(
@@ -97,14 +97,18 @@ def last_committer_stats(count):
             committer['key'], committer['doc_count'], committer['line_stats']['sum']))
     print('=' * 80)
 
-# get trace logger and set level
-tracer = logging.getLogger('elasticsearch.trace')
-tracer.setLevel(logging.INFO)
-tracer.addHandler(logging.FileHandler('/tmp/es_trace.log'))
-# instantiate es client, connects to localhost:9200 by default
-es = Elasticsearch()
+def main():
+    # get trace logger and set level
+    tracer = logging.getLogger('elasticsearch.trace')
+    tracer.setLevel(logging.INFO)
+    tracer.addHandler(logging.FileHandler('/tmp/es_trace.log'))
+    # instantiate es client, connects to localhost:9200 by default
+    es = Elasticsearch()
 
-empty_search()
-find_term('fix')
-latest_commits(5)
-last_committer_stats(10)
+    empty_search(es)
+    find_term(es, 'fix')
+    latest_commits(es, 5)
+    last_committer_stats(es, 10)
+
+if __name__ == '__main__':
+    main()
