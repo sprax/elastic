@@ -22,23 +22,29 @@ from requests_aws4auth import AWS4Auth
 
 # from urllib.parse import urlparse
 
-def get_aws_es_service_client(args):
+def get_aws_es_service_client(service_name='es'):
     '''Get client for the AWS Elasticsearch domain service'''
-    aws_es_service_client = boto3.client('es')
+    return boto3.client(service_name)
+
+def try_aws_es_service_client(args):
+    '''Get client for the AWS Elasticsearch domain service'''
+    aws_es_service_client = get_aws_es_service_client()
+
+    result = aws_es_service_client.list_domain_names()
+    status = result['ResponseMetadata']['HTTPStatusCode']
+    print("HTTP status: ", status)
+    domain_names = [dom['DomainName'] for dom in result['DomainNames']]
+    print("DOMAIN NAMES:", domain_names)
 
     if args.dir:
         print("ES client dir:\n", dir(aws_es_service_client))
         print()
-
     if args.describe:
-        result = aws_es_service_client.list_domain_names()
-        status = result['ResponseMetadata']['HTTPStatusCode']
-        print("HTTP status: ", status)
-        domain_names = [dom['DomainName'] for dom in result['DomainNames']]
-        print("DOMAIN NAMES:", domain_names)
         for name in domain_names:
             print("DOMAIN:", name, "\n", aws_es_service_client.describe_elasticsearch_domain(DomainName=name), "\n")
+        print()
     return aws_es_service_client
+
 
 def print_search_stats(results, maxlen=100):
     '''print number and latency of results'''
@@ -65,7 +71,6 @@ def print_hits(results, maxlen=100):
             truncate(hit['_source']['content'], maxlen)
             ))
     print('=' * maxlen)
-    print()
 
 def match_query(term):
     '''body for a simple match query'''
@@ -119,22 +124,24 @@ def main():
     '''get args and try stuff'''
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
-    parser.add_argument('-environment', action='store_true',
+    parser.add_argument('-env', action='store_true',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
-    parser.add_argument('-domains', action='store_true', help='Show ES domain descriptions')
+    parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
+    parser.add_argument('-info', action='store_true', help='Show info on ES services')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
     args = parser.parse_args()
     beg_time = time.time()
     try:
         if args.domains:
-            _ = get_aws_es_service_client(args)
+            try_aws_es_service_client(args)
 
-        esearch = get_elasticsearch_client(args.boto)
+        esearch = get_elasticsearch_client(not args.env)
         if esearch:
-            print(esearch.info(), "\n")
+            if args.info:
+                print(esearch.info(), "\n")
             search_bot(esearch)
 
         print("SUCCESS")
