@@ -1,5 +1,8 @@
+#!/usr/bin/env python3
+# Sprax Lines       2017.12      Written for Python 3.5
+'''Elasticsearch with boto3'''
 
-
+import argparse
 import time
 import os
 
@@ -16,21 +19,34 @@ from elasticsearch import RequestsHttpConnection
 from urllib.parse import urlparse
 
 def main(**kwargs):
-    es_client = boto3.client('es')
-    print("ES:", dir(es_client))
-    print()
-    result = es_client.list_domain_names()
-    status = result['ResponseMetadata']['HTTPStatusCode']
-    print("status: ", status)
+    '''get args and try stuff'''
 
-    domain_names = [dom['DomainName'] for dom in result['DomainNames']]
-    print("LIST:", domain_names)
+    parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
+    parser.add_argument('-describe', action='store_true', help='describe available ES clients')
+    parser.add_argument('-dir', action='store_true', help='show directory of client methods')
+    parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
+                        help='verbosity of output (default: 1)')
+    args = parser.parse_args()
 
-    for name in domain_names:
-        print("DOMAIN:", name, "\n", es_client.describe_elasticsearch_domain(DomainName=name), "\n")
+    try:
+        es_client = boto3.client('es')
 
+        if args.dir:
+            print("ES client dir:\n", dir(es_client))
+            print()
 
-    print("DONE")
+        if args.describe:
+            result = es_client.list_domain_names()
+            status = result['ResponseMetadata']['HTTPStatusCode']
+            print("HTTP status: ", status)
+            domain_names = [dom['DomainName'] for dom in result['DomainNames']]
+            print("DOMAIN NAMES:", domain_names)
+            for name in domain_names:
+                print("DOMAIN:", name, "\n", es_client.describe_elasticsearch_domain(DomainName=name), "\n")
+
+        print("SUCCESS")
+    except:
+        print("FAILURE")
 
 
 if __name__ == '__main__':
