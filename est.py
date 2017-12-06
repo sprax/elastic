@@ -5,22 +5,20 @@
 import argparse
 import time
 import os
-from dateutil.parser import parse as parse_date
-
+#from dateutil.parser import parse as parse_date
 
 import boto3
 import botocore
-import requests
+# import requests
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
-# from aws_requests_auth.boto_utils import AWSRequestsAuth
+from aws_requests_auth.boto_utils import AWSRequestsAuth
 
-from elasticsearch import Connection
+# from elasticsearch import Connection
 from elasticsearch import Elasticsearch
 from elasticsearch import RequestsHttpConnection
-
 from requests_aws4auth import AWS4Auth
 
-from urllib.parse import urlparse
+# from urllib.parse import urlparse
 
 def get_aws_es_service_client(args):
     '''Get client for the AWS Elasticsearch domain service'''
@@ -41,37 +39,39 @@ def get_aws_es_service_client(args):
     return aws_es_service_client
 
 def print_search_stats(results, maxlen=100):
+    '''print number and latency of results'''
     print('=' * maxlen)
     print('Total %d found in %dms' % (results['hits']['total'], results['took']))
     print('-' * maxlen)
 
 def truncate(string, maxlen=100):
-    if len(string) < maxlen:
+    '''truncate string to be <= maxlen, plus ellipses'''
+    if len(string) <= maxlen:
         return string
     return string[:maxlen] + "..."
 
 def print_hits(results, maxlen=100):
-    " Simple utility function to print results of a search query. "
+    '''Simple utility function to print results of a search query'''
     print_search_stats(results)
     hit = results['hits']['hits'][0]
     print("index: %s    type: %s" % (hit['_index'], hit['_type']))
     for hit in results['hits']['hits']:
         # get created date for a repo and fallback to authored_date for a commit
         print('%s\t%s\t%s' % (
-              hit['_source']['kb_document_id'],
-              hit['_id'],
-              truncate(hit['_source']['content'], maxlen)
-             ))
+            hit['_source']['kb_document_id'],
+            hit['_id'],
+            truncate(hit['_source']['content'], maxlen)
+            ))
     print('=' * maxlen)
     print()
 
 
-def search_bot(es, index='bot2', term='points', count=5):
+def search_bot(esearch, index='bot2', term='points', count=5):
     '''FIXME: using default size'''
 
     print('Search results, max %d:' % count)
     try:
-        results = es.search(
+        results = esearch.search(
             index=index,
             doc_type='kb_document',
             body={
@@ -98,39 +98,37 @@ def get_elasticsearch_client(use_boto=True):
     else:
         aws_auth = AWS4Auth(access_key, secret_key, aws_region, 'es')
 
-    es = Elasticsearch(
+    return Elasticsearch(
         hosts=[{'host': hostname, 'port': 443}],
         http_auth=aws_auth,
         use_ssl=True,
         verify_certs=True,
         connection_class=RequestsHttpConnection
     )
-    print(es.info(), "\n")
 
-    search_bot(es)
-
-
-
-
-
-def main(**kwargs):
+def main():
     '''get args and try stuff'''
-
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
     parser.add_argument('-boto', action='store_true', help='use boto3 (read AWS credentials from file)')
     parser.add_argument('-describe', action='store_true', help='describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='show directory of client methods')
+    parser.add_argument('-domains', action='store_true', help='show directory of client methods')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='verbosity of output (default: 1)')
     args = parser.parse_args()
-
+    beg_time = time.time()
     try:
-        service = get_aws_es_service_client(args)
+        if args.domains:
+            service = get_aws_es_service_client(args)
         esearch = get_elasticsearch_client(args.boto)
+        print(esearch.info(), "\n")
+        search_bot(esearch)
         print("SUCCESS")
     except botocore.exceptions.UnknownServiceError as ex:
         print("FAILURE:", ex)
+    end_time = time.time()
+    print("Elapsed time: %d seconds" % (end_time - beg_time))
 
 if __name__ == '__main__':
     main()
