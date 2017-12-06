@@ -5,6 +5,8 @@
 import argparse
 import time
 import os
+from dateutil.parser import parse as parse_date
+
 
 import boto3
 import botocore
@@ -38,6 +40,51 @@ def get_aws_es_service_client(args):
             print("DOMAIN:", name, "\n", aws_es_service_client.describe_elasticsearch_domain(DomainName=name), "\n")
     return aws_es_service_client
 
+def print_search_stats(results, maxlen=100):
+    print('=' * maxlen)
+    print('Total %d found in %dms' % (results['hits']['total'], results['took']))
+    print('-' * maxlen)
+
+def truncate(string, maxlen=100):
+    if len(string) < maxlen:
+        return string
+    return string[:maxlen] + "..."
+
+def print_hits(results, maxlen=100):
+    " Simple utility function to print results of a search query. "
+    print_search_stats(results)
+    hit = results['hits']['hits'][0]
+    print("index: %s    type: %s" % (hit['_index'], hit['_type']))
+    for hit in results['hits']['hits']:
+        # get created date for a repo and fallback to authored_date for a commit
+        print('%s\t%s\t%s' % (
+              hit['_source']['kb_document_id'],
+              hit['_id'],
+              truncate(hit['_source']['content'], maxlen)
+             ))
+    print('=' * maxlen)
+    print()
+
+
+def search_bot(es, index='bot2', term='points', count=5):
+    '''FIXME: using default size'''
+
+    print('Search results, max %d:' % count)
+    try:
+        results = es.search(
+            index=index,
+            doc_type='kb_document',
+            body={
+                'query' : {
+                    'match' : {
+                        "content" : term
+                    }
+                }
+            }
+        )
+    except Exception as ex:
+        print("ERROR:", ex)
+    print_hits(results)
 
 def get_elasticsearch_client(use_boto=True):
     '''Get Elasticsearch client for one AWS ES domain'''
@@ -58,13 +105,19 @@ def get_elasticsearch_client(use_boto=True):
         verify_certs=True,
         connection_class=RequestsHttpConnection
     )
-    print(es.info())
+    print(es.info(), "\n")
+
+    search_bot(es)
+
+
+
 
 
 def main(**kwargs):
     '''get args and try stuff'''
 
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
+    parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
     parser.add_argument('-boto', action='store_true', help='use boto3 (read AWS credentials from file)')
     parser.add_argument('-describe', action='store_true', help='describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='show directory of client methods')
