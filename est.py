@@ -80,11 +80,7 @@ def search_bot(esearch, index='bot2', term='points', count=5):
 
     print('Search results, max %d:' % count)
     try:
-        results = esearch.search(
-            index=index,
-            doc_type='kb_document',
-            body=match_query(term)
-        )
+        results = esearch.search(index=index, doc_type='kb_document', body=match_query(term))
     except Exception as ex:
         print("ERROR:", ex)
     print_hits(results)
