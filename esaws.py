@@ -10,8 +10,10 @@ import os
 import boto3
 import botocore
 # import requests
+
+# from aws_requests_auth.exceptions import NoSecretKeyError
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
-# from aws_requests_auth.boto_utils import AWSRequestsAuth
+from aws_requests_auth.boto_utils import AWSRequestsAuth
 
 # from elasticsearch import Connection
 from elasticsearch import Elasticsearch
@@ -93,36 +95,48 @@ def get_elasticsearch_client(use_boto=True):
     hostname = os.environ.get('AWS_ELASTICSEARCH_HOST')
 
     if use_boto:
-        aws_auth = BotoAWSRequestsAuth(aws_host=hostname, aws_region=aws_region, aws_service='es')
+        try:
+            aws_auth = BotoAWSRequestsAuth(aws_host=hostname, aws_region=aws_region, aws_service='es')
+        except Exception as ex:
+            print("No AWS credentials in ~/.aws/credentials ?", ex)
     else:
-        aws_auth = AWS4Auth(access_key, secret_key, aws_region, 'es')
+        try:
+            aws_auth = AWS4Auth(access_key, secret_key, aws_region, 'es')
+        except Exception as ex:
+            print("No AWS credentials exported to ENV ?", ex)
 
-    return Elasticsearch(
-        hosts=[{'host': hostname, 'port': 443}],
-        http_auth=aws_auth,
-        use_ssl=True,
-        verify_certs=True,
-        connection_class=RequestsHttpConnection
-    )
+    if aws_auth:
+        return Elasticsearch(
+            hosts=[{'host': hostname, 'port': 443}],
+            http_auth=aws_auth,
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection
+        )
+    return None
 
 def main():
     '''get args and try stuff'''
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
-    parser.add_argument('-boto', action='store_true', help='use boto3 (read AWS credentials from file)')
-    parser.add_argument('-describe', action='store_true', help='describe available ES clients')
-    parser.add_argument('-dir', action='store_true', help='show directory of client methods')
-    parser.add_argument('-domains', action='store_true', help='show directory of client methods')
+    parser.add_argument('-environment', action='store_true',
+                        help='Use ENV variables instead of reading AWS credentials from file (boto)')
+    parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
+    parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
+    parser.add_argument('-domains', action='store_true', help='Show ES domain descriptions')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
-                        help='verbosity of output (default: 1)')
+                        help='Verbosity of output (default: 1)')
     args = parser.parse_args()
     beg_time = time.time()
     try:
         if args.domains:
             _ = get_aws_es_service_client(args)
+
         esearch = get_elasticsearch_client(args.boto)
-        print(esearch.info(), "\n")
-        search_bot(esearch)
+        if esearch:
+            print(esearch.info(), "\n")
+            search_bot(esearch)
+
         print("SUCCESS")
     except botocore.exceptions.UnknownServiceError as ex:
         print("FAILURE:", ex)
