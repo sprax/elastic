@@ -44,6 +44,9 @@ def main(**kwargs):
             for name in domain_names:
                 print("DOMAIN:", name, "\n", es_client.describe_elasticsearch_domain(DomainName=name), "\n")
 
+        res = requests.get('http://localhost:9200')
+        print(res.content)
+
         print("SUCCESS")
     except botocore.exceptions.UnknownServiceError as ex:
         print("FAILURE:", ex)
