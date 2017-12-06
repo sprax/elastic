@@ -50,35 +50,35 @@ def try_aws_es_service_client(args):
     return aws_es_service_client
 
 
-def get_elasticsearch_client(use_boto=True):
-    '''Get Elasticsearch client for one AWS ES domain (determined by hostname)'''
-    elasticsearch_client = None
-
-    access_key = os.environ.get('AWS_ACCESS_KEY_ID')
-    secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    aws_region = os.environ.get('AWS_REGION')
-    hostname = os.environ.get('AWS_ELASTICSEARCH_HOST')
-
+def get_aws_auth(hostname, region, use_boto=True):
+    '''Get http_aoth for AWS clients'''
     if use_boto:
         try:
-            aws_auth = BotoAWSRequestsAuth(aws_host=hostname, aws_region=aws_region, aws_service='es')
-        except Exception as ex:
+            return BotoAWSRequestsAuth(aws_host=hostname, aws_region=region, aws_service='es')
+        except TypeError as ex:
             print("No AWS credentials in ~/.aws/credentials ?", ex)
     else:
+        access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+        secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
         try:
-            aws_auth = AWS4Auth(access_key, secret_key, aws_region, 'es')
-        except Exception as ex:
+            return AWS4Auth(access_key, secret_key, region, 'es')
+        except TypeError as ex:
             print("No AWS credentials exported to ENV ?", ex)
+    return None
 
-    if aws_auth:
-        elasticsearch_client = Elasticsearch(
-            hosts=[{'host': hostname, 'port': 443}],
-            http_auth=aws_auth,
-            use_ssl=True,
-            verify_certs=True,
-            connection_class=RequestsHttpConnection
-        )
-    return elasticsearch_client
+def get_elasticsearch_client(use_boto=True):
+    '''Get Elasticsearch client for one AWS ES domain (determined by hostname)'''
+    hostname = os.environ.get('AWS_ELASTICSEARCH_HOST')
+    region = os.environ.get('AWS_REGION')
+    aws_auth = get_aws_auth(hostname, region, use_boto)
+    return Elasticsearch(
+        hosts=[{'host': hostname, 'port': 443}],
+        http_auth=aws_auth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection
+    )
+
 
 MAXLEN = 80
 
@@ -96,17 +96,20 @@ def truncate(string, maxlen=MAXLEN):
 
 def print_hits(results, maxlen=MAXLEN):
     '''Simple utility function to print results of a search query'''
-    print_search_stats(results)
-    hit = results['hits']['hits'][0]
-    print("index: %s    type: %s" % (hit['_index'], hit['_type']))
-    for hit in results['hits']['hits']:
-        # get created date for a repo and fallback to authored_date for a commit
-        print('%s\t%s\t%s' % (
-            hit['_source']['kb_document_id'],
-            hit['_id'],
-            truncate(hit['_source']['content'], maxlen)
-            ))
-    print('=' * maxlen)
+    if results:
+        print_search_stats(results)
+        hit = results['hits']['hits'][0]
+        print("index: %s    type: %s" % (hit['_index'], hit['_type']))
+        for hit in results['hits']['hits']:
+            # get created date for a repo and fallback to authored_date for a commit
+            print('%s\t%s\t%s' % (
+                hit['_source']['kb_document_id'],
+                hit['_id'],
+                truncate(hit['_source']['content'], maxlen)
+                ))
+        print('=' * maxlen)
+    else:
+        print("---- NO RESULTS ----")
 
 def match_query(term):
     '''body for a simple match query'''
@@ -118,14 +121,31 @@ def match_query(term):
         }
     }
 
+def most_fields_query(qstring, field_names=None):
+    '''Prepare body for a most_fields query on the specified fields (e.g. "content")'''
+    if field_names is None:
+        field_names = ['content', 'content.raw']
+    return {
+        'query' : {
+            'multi_match' : {
+                'type' : 'most_fields',
+                'query' : qstring,
+                'fields' : field_names
+            }
+        }
+    }
+
 def search_index(esearch, index='bot2', term='points', count=5):
     '''FIXME: using default size'''
 
     print('Searching for results, max %d:' % count)
     try:
-        results = esearch.search(index=index, doc_type='kb_document', body=match_query(term))
-    except Exception as ex:
-        print("ERROR:", ex)
+        results = esearch.search(index=index,
+                                 doc_type='kb_document',
+                                 body=match_query(term)
+                                )
+    except TypeError as ex:
+        print("ERROR in Elasticsearch.search (AWS credentials?): ", ex)
         return None
     return results
 
