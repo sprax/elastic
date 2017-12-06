@@ -45,8 +45,8 @@ def main(**kwargs):
                 print("DOMAIN:", name, "\n", es_client.describe_elasticsearch_domain(DomainName=name), "\n")
 
         print("SUCCESS")
-    except:
-        print("FAILURE")
+    except botocore.exceptions.UnknownServiceError as ex:
+        print("FAILURE:", ex)
 
 
 if __name__ == '__main__':
