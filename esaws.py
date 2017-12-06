@@ -12,8 +12,8 @@ import botocore
 # import requests
 
 # from aws_requests_auth.exceptions import NoSecretKeyError
+# from aws_requests_auth.boto_utils import AWSRequestsAuth
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
-from aws_requests_auth.boto_utils import AWSRequestsAuth
 
 # from elasticsearch import Connection
 from elasticsearch import Elasticsearch
@@ -42,7 +42,8 @@ def try_aws_es_service_client(args):
             print()
         if args.describe:
             for name in domain_names:
-                print("DOMAIN:", name, "\n", aws_es_service_client.describe_elasticsearch_domain(DomainName=name), "\n")
+                print("DOMAIN:", name)
+                print(aws_es_service_client.describe_elasticsearch_domain(DomainName=name), "\n")
             print()
     except botocore.exceptions.UnknownServiceError as ex:
         print("FAILURE:", ex)
@@ -79,19 +80,21 @@ def get_elasticsearch_client(use_boto=True):
         )
     return elasticsearch_client
 
-def print_search_stats(results, maxlen=100):
+MAXLEN = 80
+
+def print_search_stats(results, maxlen=MAXLEN):
     '''print number and latency of results'''
     print('=' * maxlen)
     print('Total %d found in %dms' % (results['hits']['total'], results['took']))
     print('-' * maxlen)
 
-def truncate(string, maxlen=100):
+def truncate(string, maxlen=MAXLEN):
     '''if string is longer than maxlen, truncate it and add ellipses'''
     if len(string) > maxlen:
         return string[:maxlen] + "..."
     return string
 
-def print_hits(results, maxlen=100):
+def print_hits(results, maxlen=MAXLEN):
     '''Simple utility function to print results of a search query'''
     print_search_stats(results)
     hit = results['hits']['hits'][0]
@@ -115,22 +118,22 @@ def match_query(term):
         }
     }
 
-def search_bot(esearch, index='bot2', term='points', count=5):
+def search_index(esearch, index='bot2', term='points', count=5):
     '''FIXME: using default size'''
 
-    print('Search results, max %d:' % count)
+    print('Searching for results, max %d:' % count)
     try:
         results = esearch.search(index=index, doc_type='kb_document', body=match_query(term))
     except Exception as ex:
         print("ERROR:", ex)
         return None
-    print_hits(results)
     return results
 
 def main():
     '''get args and try stuff'''
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
+    parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
     parser.add_argument('-env', action='store_true',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
@@ -148,7 +151,8 @@ def main():
     if esearch:
         if args.info:
             print("Elasticsearch client info:", esearch.info(), "\n")
-        res = search_bot(esearch)
+        results = search_index(esearch, args.index, args.query)
+        print_hits(results)
 
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
