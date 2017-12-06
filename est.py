@@ -11,7 +11,7 @@ import boto3
 import botocore
 # import requests
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
-from aws_requests_auth.boto_utils import AWSRequestsAuth
+# from aws_requests_auth.boto_utils import AWSRequestsAuth
 
 # from elasticsearch import Connection
 from elasticsearch import Elasticsearch
@@ -65,6 +65,15 @@ def print_hits(results, maxlen=100):
     print('=' * maxlen)
     print()
 
+def match_query(term):
+    '''body for a simple match query'''
+    return {
+        "query" : {
+            "match" : {
+                "content" : term
+            }
+        }
+    }
 
 def search_bot(esearch, index='bot2', term='points', count=5):
     '''FIXME: using default size'''
@@ -74,13 +83,7 @@ def search_bot(esearch, index='bot2', term='points', count=5):
         results = esearch.search(
             index=index,
             doc_type='kb_document',
-            body={
-                'query' : {
-                    'match' : {
-                        "content" : term
-                    }
-                }
-            }
+            body=match_query(term)
         )
     except Exception as ex:
         print("ERROR:", ex)
@@ -120,7 +123,7 @@ def main():
     beg_time = time.time()
     try:
         if args.domains:
-            service = get_aws_es_service_client(args)
+            _ = get_aws_es_service_client(args)
         esearch = get_elasticsearch_client(args.boto)
         print(esearch.info(), "\n")
         search_bot(esearch)
