@@ -28,23 +28,56 @@ def get_aws_es_service_client(service_name='es'):
 
 def try_aws_es_service_client(args):
     '''Get client for the AWS Elasticsearch domain service'''
-    aws_es_service_client = get_aws_es_service_client()
-
-    result = aws_es_service_client.list_domain_names()
-    status = result['ResponseMetadata']['HTTPStatusCode']
-    print("HTTP status: ", status)
-    domain_names = [dom['DomainName'] for dom in result['DomainNames']]
-    print("DOMAIN NAMES:", domain_names)
-
-    if args.dir:
-        print("ES client dir:\n", dir(aws_es_service_client))
+    aws_es_service_client = None
+    try:
+        aws_es_service_client = get_aws_es_service_client()
+        result = aws_es_service_client.list_domain_names()
+        status = result['ResponseMetadata']['HTTPStatusCode']
+        print("HTTP status: ", status)
+        domain_names = [dom['DomainName'] for dom in result['DomainNames']]
+        print("DOMAIN NAMES:", domain_names)
         print()
-    if args.describe:
-        for name in domain_names:
-            print("DOMAIN:", name, "\n", aws_es_service_client.describe_elasticsearch_domain(DomainName=name), "\n")
-        print()
+        if args.dir:
+            print("ES client dir:\n", dir(aws_es_service_client))
+            print()
+        if args.describe:
+            for name in domain_names:
+                print("DOMAIN:", name, "\n", aws_es_service_client.describe_elasticsearch_domain(DomainName=name), "\n")
+            print()
+    except botocore.exceptions.UnknownServiceError as ex:
+        print("FAILURE:", ex)
     return aws_es_service_client
 
+
+def get_elasticsearch_client(use_boto=True):
+    '''Get Elasticsearch client for one AWS ES domain (determined by hostname)'''
+    elasticsearch_client = None
+
+    access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+    secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    aws_region = os.environ.get('AWS_REGION')
+    hostname = os.environ.get('AWS_ELASTICSEARCH_HOST')
+
+    if use_boto:
+        try:
+            aws_auth = BotoAWSRequestsAuth(aws_host=hostname, aws_region=aws_region, aws_service='es')
+        except Exception as ex:
+            print("No AWS credentials in ~/.aws/credentials ?", ex)
+    else:
+        try:
+            aws_auth = AWS4Auth(access_key, secret_key, aws_region, 'es')
+        except Exception as ex:
+            print("No AWS credentials exported to ENV ?", ex)
+
+    if aws_auth:
+        elasticsearch_client = Elasticsearch(
+            hosts=[{'host': hostname, 'port': 443}],
+            http_auth=aws_auth,
+            use_ssl=True,
+            verify_certs=True,
+            connection_class=RequestsHttpConnection
+        )
+    return elasticsearch_client
 
 def print_search_stats(results, maxlen=100):
     '''print number and latency of results'''
@@ -53,10 +86,10 @@ def print_search_stats(results, maxlen=100):
     print('-' * maxlen)
 
 def truncate(string, maxlen=100):
-    '''truncate string to be <= maxlen, plus ellipses'''
-    if len(string) <= maxlen:
-        return string
-    return string[:maxlen] + "..."
+    '''if string is longer than maxlen, truncate it and add ellipses'''
+    if len(string) > maxlen:
+        return string[:maxlen] + "..."
+    return string
 
 def print_hits(results, maxlen=100):
     '''Simple utility function to print results of a search query'''
@@ -90,35 +123,9 @@ def search_bot(esearch, index='bot2', term='points', count=5):
         results = esearch.search(index=index, doc_type='kb_document', body=match_query(term))
     except Exception as ex:
         print("ERROR:", ex)
+        return None
     print_hits(results)
-
-def get_elasticsearch_client(use_boto=True):
-    '''Get Elasticsearch client for one AWS ES domain'''
-    access_key = os.environ.get('AWS_ACCESS_KEY_ID')
-    secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    aws_region = os.environ.get('AWS_REGION')
-    hostname = os.environ.get('AWS_ELASTICSEARCH_HOST')
-
-    if use_boto:
-        try:
-            aws_auth = BotoAWSRequestsAuth(aws_host=hostname, aws_region=aws_region, aws_service='es')
-        except Exception as ex:
-            print("No AWS credentials in ~/.aws/credentials ?", ex)
-    else:
-        try:
-            aws_auth = AWS4Auth(access_key, secret_key, aws_region, 'es')
-        except Exception as ex:
-            print("No AWS credentials exported to ENV ?", ex)
-
-    if aws_auth:
-        return Elasticsearch(
-            hosts=[{'host': hostname, 'port': 443}],
-            http_auth=aws_auth,
-            use_ssl=True,
-            verify_certs=True,
-            connection_class=RequestsHttpConnection
-        )
-    return None
+    return results
 
 def main():
     '''get args and try stuff'''
@@ -134,19 +141,15 @@ def main():
                         help='Verbosity of output (default: 1)')
     args = parser.parse_args()
     beg_time = time.time()
-    try:
-        if args.domains:
-            try_aws_es_service_client(args)
+    if args.domains:
+        try_aws_es_service_client(args)
 
-        esearch = get_elasticsearch_client(not args.env)
-        if esearch:
-            if args.info:
-                print(esearch.info(), "\n")
-            search_bot(esearch)
+    esearch = get_elasticsearch_client(not args.env)
+    if esearch:
+        if args.info:
+            print("Elasticsearch client info:", esearch.info(), "\n")
+        res = search_bot(esearch)
 
-        print("SUCCESS")
-    except botocore.exceptions.UnknownServiceError as ex:
-        print("FAILURE:", ex)
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
 
