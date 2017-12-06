@@ -111,12 +111,12 @@ def print_hits(results, maxlen=MAXLEN):
     else:
         print("---- NO RESULTS ----")
 
-def match_query(term):
+def match_query(qstring):
     '''body for a simple match query'''
     return {
         "query" : {
             "match" : {
-                "content" : term
+                "content" : qstring
             }
         }
     }
@@ -135,14 +135,14 @@ def most_fields_query(qstring, field_names=None):
         }
     }
 
-def search_index(esearch, index='bot2', term='points', count=5):
+def search_index(esearch, index='bot2', qstring='points', count=5):
     '''FIXME: using default size'''
 
     print('Searching for results, max %d:' % count)
     try:
         results = esearch.search(index=index,
                                  doc_type='kb_document',
-                                 body=match_query(term)
+                                 body=most_fields_query(qstring)
                                 )
     except TypeError as ex:
         print("ERROR in Elasticsearch.search (AWS credentials?): ", ex)
