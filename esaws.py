@@ -14,11 +14,12 @@ import botocore
 # from aws_requests_auth.exceptions import NoSecretKeyError
 # from aws_requests_auth.boto_utils import AWSRequestsAuth
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
+from requests_aws4auth import AWS4Auth
 
 # from elasticsearch import Connection
 from elasticsearch import Elasticsearch
 from elasticsearch import RequestsHttpConnection
-from requests_aws4auth import AWS4Auth
+from elasticsearch.exceptions import TransportError
 
 # from urllib.parse import urlparse
 
@@ -69,7 +70,10 @@ def get_aws_auth(hostname, region, use_boto=True):
 def get_elasticsearch_client(use_boto=True):
     '''Get Elasticsearch client for one AWS ES domain (determined by hostname)'''
     hostname = os.environ.get('AWS_ELASTICSEARCH_HOST')
-    region = os.environ.get('AWS_REGION')
+    region = os.environ.get('AWS_DEFAULT_REGION')
+    if region is None:
+        import pdb; pdb.set_trace()
+        region = 'us-east-1'
     aws_auth = get_aws_auth(hostname, region, use_boto)
     return Elasticsearch(
         hosts=[{'host': hostname, 'port': 443}],
