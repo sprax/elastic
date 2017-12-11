@@ -72,7 +72,7 @@ def get_elasticsearch_client(use_boto=True):
     hostname = os.environ.get('AWS_ELASTICSEARCH_HOST')
     region = os.environ.get('AWS_DEFAULT_REGION')
     if region is None:
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         region = 'us-east-1'
     aws_auth = get_aws_auth(hostname, region, use_boto)
     return Elasticsearch(
@@ -139,16 +139,16 @@ def most_fields_query(qstring, field_names=None):
         }
     }
 
-def search_index(esearch, index='bot2', qstring='points', count=5):
+def search_index(esearch, index='bot2', qstring='points', qtype=most_fields_query, count=5):
     '''FIXME: using default size'''
 
     print('Searching for results, max %d:' % count)
     try:
         results = esearch.search(index=index,
                                  doc_type='kb_document',
-                                 body=most_fields_query(qstring)
+                                 body=qtype(qstring)
                                 )
-    except TypeError as ex:
+    except (TypeError, TransportError) as ex:
         print("ERROR in Elasticsearch.search (AWS credentials?): ", ex)
         return None
     return results
@@ -158,6 +158,7 @@ def main():
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
+    parser.add_argument('type', type=str, nargs='?', default='most_fields_query', help='query type for search')
     parser.add_argument('-env', action='store_true',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
