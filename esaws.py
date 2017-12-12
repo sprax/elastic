@@ -23,6 +23,76 @@ from elasticsearch.exceptions import TransportError
 
 # from urllib.parse import urlparse
 
+
+def match_query(qstring):
+    '''body for a simple match query'''
+    return {
+        "query" : {
+            "match" : {
+                "content" : qstring
+            }
+        }
+    }
+
+def most_fields_query(qstring, field_names=None):
+    '''Prepare body for a most_fields query on the specified fields (e.g. "content")'''
+    if field_names is None:
+        field_names = ['content', 'content.raw']
+    return {
+        'query' : {
+            'multi_match' : {
+                'type' : 'most_fields',
+                'query' : qstring,
+                'fields' : field_names
+            }
+        }
+    }
+
+def match_phrase_query(qstring, field_names=['content']):
+    '''Prepare a whole phrase only query on the specified fields'''
+    return {
+        'query' : {
+            "multi_match" : {
+                "type" : "phrase_prefix",
+                "query" : qstring,
+                "fields" : field_names
+            }
+        }
+    }
+
+
+def query_string_query(qstring, property_name = 'content'):
+    '''Prepare a query_string query on the specified field (e.g. "content").
+    NOTE: query_string may tacitly activate fuzzy matching and other features.
+    NOTE: query_string is best used in conjunction with a normalizer
+    NOTE: The qstring should contain at least one whole word for this to match; for
+    example, "Soston Office" will be matched by "Boston", "office", "Boston off", and "ton office", and even "Boston ice"
+    but not by "Bost", "ton", "off", "ton off", or "ice"
+    '''
+    return {
+        "from" : 0,
+        "size" : 6,
+        "query" : {
+            "query_string" : {
+                "query" : qstring,
+                "fields" : [property_name]
+            }
+        }
+    }
+
+
+# Prepare a wildcard query on the specified field (e.g. "content")
+# NOTE: Wildcard query terms must already be lowercase to match pre-lowercased index terms.
+# NOTE: Bigrams are not found; e.g. "boston" or "office" will be found, but not "boston office"
+def wildcard_query(qstring, property_name = 'content'):
+    return {
+        'query' : {
+            'wildcard' : {
+                property_name : "*%s*" % property_name
+            }
+        }
+    }
+
 def get_aws_es_service_client(service_name='es'):
     '''Get client for the AWS Elasticsearch domain service'''
     return boto3.client(service_name)
@@ -114,30 +184,6 @@ def print_hits(results, maxlen=MAXLEN):
         print('=' * maxlen)
     else:
         print("---- NO RESULTS ----")
-
-def match_query(qstring):
-    '''body for a simple match query'''
-    return {
-        "query" : {
-            "match" : {
-                "content" : qstring
-            }
-        }
-    }
-
-def most_fields_query(qstring, field_names=None):
-    '''Prepare body for a most_fields query on the specified fields (e.g. "content")'''
-    if field_names is None:
-        field_names = ['content', 'content.raw']
-    return {
-        'query' : {
-            'multi_match' : {
-                'type' : 'most_fields',
-                'query' : qstring,
-                'fields' : field_names
-            }
-        }
-    }
 
 def search_index(esearch, index='bot2', qstring='points', qtype=most_fields_query, count=5):
     '''FIXME: using default size'''
