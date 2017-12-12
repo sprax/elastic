@@ -163,9 +163,12 @@ MAXLEN = 80
 
 def print_search_stats(results, maxlen=MAXLEN):
     '''print number and latency of results'''
-    print('=' * maxlen)
-    print('Total %d found in %dms' % (results['hits']['total'], results['took']))
-    print('-' * maxlen)
+    if results:
+        print('=' * maxlen)
+        hit = results['hits']['hits'][0]
+        print('Found %d total hits of type %s in index %s in %d ms'
+              % (results['hits']['total'], hit['_type'], hit['_index'], results['took']))
+        print('-' * maxlen)
 
 def truncate(string, maxlen=MAXLEN):
     '''if string is longer than maxlen, truncate it and add ellipses'''
@@ -199,26 +202,27 @@ def extract_scores_and_ids(index_name, qstring, results, threshold):
     return es_results, max_score, sum_score
 
 
-def print_hits(results, min_score=0.0, maxlen=MAXLEN):
+def print_hits(results, min_score=0.0, maxlen=MAXLEN, verbose=1):
     '''Simple utility function to print results of a search query'''
     if results:
         print_search_stats(results)
-        hit = results['hits']['hits'][0]
-        print("index: %s\ttype: %s" % (hit['_index'], hit['_type']))
         for hit in results['hits']['hits']:
             # get created date for a repo and fallback to authored_date for a commit
             hit_score = hit['_score']
             if hit_score >= min_score:
-                print('%8.4f\t%s\t%36s\t%36s' % (
-                    hit_score,
-                    truncate(hit['_source']['content'], maxlen),
-                    hit['_source']['kb_document_id'],
-                    hit['_id']
-                ))
+                if verbose > 1:
+                    print('%8.4f\t%s\t%36s\t%36s' % (
+                        hit_score,
+                        truncate(hit['_source']['content'], maxlen),
+                        hit['_source']['kb_document_id'],
+                        hit['_id']
+                    ))
+                else:
+                    print('%8.4f\t%s' % (hit_score, truncate(hit['_source']['content'], maxlen)))
         print('=' * maxlen)
     else:
         print("---- NO RESULTS ----")
-        
+
 
 def zot_index_name(zoid):
     '''get Elasticsearch index name from zoid'''
@@ -242,8 +246,8 @@ class ElasticsearchClient:
 
     def search_index(self, qstring, offset=0, max_size=10):
         '''Search the index using all the parameters.'''
-        print('Searching index %s (offset %d, max_size %d) for: "%s"'
-              % (self.index_name, offset, max_size, qstring))
+        print('Searching index %s, type %s (offset %d, max_size %d) for: "%s"'
+              % (self.index_name, self.doc_type, offset, max_size, qstring))
         try:
             results = self.client.search(index=self.index_name,
                                          doc_type=self.doc_type,
