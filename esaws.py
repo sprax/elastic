@@ -204,22 +204,21 @@ def print_hits(results, min_score=0.0, maxlen=MAXLEN):
     if results:
         print_search_stats(results)
         hit = results['hits']['hits'][0]
-        print("index: %s    type: %s" % (hit['_index'], hit['_type']))
+        print("index: %s\ttype: %s" % (hit['_index'], hit['_type']))
         for hit in results['hits']['hits']:
             # get created date for a repo and fallback to authored_date for a commit
-            if hit['_score'] >= min_score:
-                print('%s\t%s\t%s' % (
+            hit_score = hit['_score']
+            if hit_score >= min_score:
+                print('%8.4f\t%s\t%36s\t%36s' % (
+                    hit_score,
+                    truncate(hit['_source']['content'], maxlen),
                     hit['_source']['kb_document_id'],
-                    hit['_id'],
-                    truncate(hit['_source']['content'], maxlen)
-                    ))
+                    hit['_id']
+                ))
         print('=' * maxlen)
     else:
         print("---- NO RESULTS ----")
-
-
-
-
+        
 
 def zot_index_name(zoid):
     '''get Elasticsearch index name from zoid'''
