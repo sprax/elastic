@@ -2,6 +2,7 @@
 # Sprax Lines       2017.12      Written for Python 3.5
 '''Elasticsearch with boto3'''
 
+from collections import namedtuple
 import argparse
 import time
 import os
@@ -172,7 +173,33 @@ def truncate(string, maxlen=MAXLEN):
         return string[:maxlen] + "..."
     return string
 
-def print_hits(results, maxlen=MAXLEN):
+
+ESResult = namedtuple('ESResult', 'hit_score doc_id entry_id')
+
+def extract_scores_and_ids(index_name, qstring, results, threshold):
+    '''
+    Convert raw Elasticsearch results into simple tuples.
+    '''
+    es_results, max_score, sum_score = [], 0.0, 0.0
+    if results:
+        try:
+            max_score = results['hits']['max_score']
+            for hit in results['hits']['hits']:
+                score = hit['_score']
+                if score >= threshold:
+                    sum_score += score
+                    kb_entry_id = hit['_id']
+                    source = hit['_source']
+                    kb_document_id = source['kb_document_id']
+                    es_results.append(ESResult(score, kb_document_id, kb_entry_id))
+        except Exception as ex:
+            print("Error parsing Elasticsearch results in index(%s): <%s>", index_name, ex)
+    else:
+        print("No Elasticsearch results in index(%s) for (%s)", index_name, qstring)
+    return es_results, max_score, sum_score
+
+
+def print_hits(results, min_score=0.0, maxlen=MAXLEN):
     '''Simple utility function to print results of a search query'''
     if results:
         print_search_stats(results)
@@ -180,14 +207,19 @@ def print_hits(results, maxlen=MAXLEN):
         print("index: %s    type: %s" % (hit['_index'], hit['_type']))
         for hit in results['hits']['hits']:
             # get created date for a repo and fallback to authored_date for a commit
-            print('%s\t%s\t%s' % (
-                hit['_source']['kb_document_id'],
-                hit['_id'],
-                truncate(hit['_source']['content'], maxlen)
-                ))
+            if hit['_score'] >= min_score:
+                print('%s\t%s\t%s' % (
+                    hit['_source']['kb_document_id'],
+                    hit['_id'],
+                    truncate(hit['_source']['content'], maxlen)
+                    ))
         print('=' * maxlen)
     else:
         print("---- NO RESULTS ----")
+
+
+
+
 
 def zot_index_name(zoid):
     '''get Elasticsearch index name from zoid'''
@@ -209,10 +241,10 @@ class ElasticsearchClient:
         print("Elasticsearch client from %s credentials" % ['ENV', 'BOTO'][self.use_boto])
         print("Elasticsearch client info:", self.client.info(), "\n")
 
-    def search_index(self, qstring, threshold=0.0, offset=0, max_size=10):
+    def search_index(self, qstring, offset=0, max_size=10):
         '''Search the index using all the parameters.'''
-        print('Searching index %s (threshold %7.4f, offset %d, max_size %d) for: "%s"'
-              % (self.index_name, threshold, offset, max_size, qstring))
+        print('Searching index %s (offset %d, max_size %d) for: "%s"'
+              % (self.index_name, offset, max_size, qstring))
         try:
             results = self.client.search(index=self.index_name,
                                          doc_type=self.doc_type,
@@ -238,8 +270,12 @@ def main():
     parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
     parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
     parser.add_argument('-info', action='store_true', help='Show info on ES services')
-    parser.add_argument('-size', type=int, nargs='?', const=1, default=6,
+    parser.add_argument('-offset', type=int, nargs='?', const=1, default=0,
+                        help='Offset into results list (default: 0)')
+    parser.add_argument('-size', type=int, nargs='?', const=5, default=6,
                         help='Maximum number of results (default: 6)')
+    parser.add_argument('-threshold', type=float, nargs='?', const=1.0, default=0.0,
+                        help='Minimum score for result hits (default: 0.0)')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
     parser.add_argument('-zoid', type=int, nargs='?', const=2, default=2,
@@ -252,8 +288,8 @@ def main():
     es_client = ElasticsearchClient(args.zoid, args.boto)
     if args.info:
         es_client.show_info()
-    results = es_client.search_index(args.query, max_size=args.size)
-    print_hits(results)
+    results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
+    print_hits(results, min_score=args.threshold)
 
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
