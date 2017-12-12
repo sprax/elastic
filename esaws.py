@@ -48,8 +48,10 @@ def most_fields_query(qstring, field_names=None):
         }
     }
 
-def match_phrase_query(qstring, field_names=['content']):
+def match_phrase_query(qstring, field_names=None):
     '''Prepare a whole phrase only query on the specified fields'''
+    if field_names is None:
+        field_names = ['content', 'content.raw']
     return {
         'query' : {
             "multi_match" : {
@@ -61,13 +63,14 @@ def match_phrase_query(qstring, field_names=['content']):
     }
 
 
-def query_string_query(qstring, property_name = 'content'):
+def query_string_query(qstring, property_name='content'):
     '''Prepare a query_string query on the specified field (e.g. "content").
     NOTE: query_string may tacitly activate fuzzy matching and other features.
     NOTE: query_string is best used in conjunction with a normalizer
     NOTE: The qstring should contain at least one whole word for this to match; for
-    example, "Soston Office" will be matched by "Boston", "office", "Boston off", and "ton office", and even "Boston ice"
-    but not by "Bost", "ton", "off", "ton off", or "ice"
+    example, "Soston Office" will be matched by "Boston", "office", "Boston off",
+    and "ton office", and even "Boston ice" but not by "Bost", "ton", "off", "ton off",
+    or "ice"
     '''
     return {
         "from" : 0,
@@ -81,14 +84,15 @@ def query_string_query(qstring, property_name = 'content'):
     }
 
 
-# Prepare a wildcard query on the specified field (e.g. "content")
-# NOTE: Wildcard query terms must already be lowercase to match pre-lowercased index terms.
-# NOTE: Bigrams are not found; e.g. "boston" or "office" will be found, but not "boston office"
-def wildcard_query(qstring, property_name = 'content'):
+def wildcard_query(qstring, property_name='content'):
+    '''Prepare a wildcard query on the specified field (e.g. "content")
+    NOTE: Wildcard query terms must already be lowercase to match pre-lowercased index terms.
+    NOTE: Bigrams are not found; e.g. "boston" or "office" will be found, but not "boston office"
+    '''
     return {
         'query' : {
             'wildcard' : {
-                property_name : "*%s*" % property_name
+                property_name : "*%s*" % qstring
             }
         }
     }
@@ -185,19 +189,42 @@ def print_hits(results, maxlen=MAXLEN):
     else:
         print("---- NO RESULTS ----")
 
-def search_index(esearch, index='bot2', qstring='points', qtype=most_fields_query, count=5):
-    '''FIXME: using default size'''
+def zot_index_name(zoid):
+    '''get Elasticsearch index name from zoid'''
+    return "bot{}".format(zoid)
 
-    print('Searching for results, max %d:' % count)
-    try:
-        results = esearch.search(index=index,
-                                 doc_type='kb_document',
-                                 body=qtype(qstring)
-                                )
-    except (TypeError, TransportError) as ex:
-        print("ERROR in Elasticsearch.search (AWS credentials?): ", ex)
-        return None
-    return results
+
+class ElasticsearchClient:
+    '''Client for searching one Elasticsearch index and type'''
+
+    def __init__(self, zoid, use_boto=True, doc_type='kb_document'):
+        '''Save the client, index, and type'''
+        self.use_boto = use_boto
+        self.client = get_elasticsearch_client(use_boto)
+        self.index_name = zot_index_name(zoid)
+        self.doc_type = doc_type
+
+    def show_info(self):
+        '''Print info about the Elasticsearch client'''
+        print("Elasticsearch client from %s credentials" % ['ENV', 'BOTO'][self.use_boto])
+        print("Elasticsearch client info:", self.client.info(), "\n")
+
+    def search_index(self, qstring, threshold=0.0, offset=0, max_size=10):
+        '''Search the index using all the parameters.'''
+        print('Searching index %s (threshold %7.4f, offset %d, max_size %d) for: "%s"'
+              % (self.index_name, threshold, offset, max_size, qstring))
+        try:
+            results = self.client.search(index=self.index_name,
+                                         doc_type=self.doc_type,
+                                         from_=offset,
+                                         size=max_size,
+                                         body=most_fields_query(qstring)
+                                        )
+        except (TypeError, TransportError) as ex:
+            print("ERROR in Elasticsearch.search (AWS credentials?): ", ex)
+            return None
+        return results
+
 
 def main():
     '''get args and try stuff'''
@@ -205,25 +232,28 @@ def main():
     parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
     parser.add_argument('type', type=str, nargs='?', default='most_fields_query', help='query type for search')
-    parser.add_argument('-env', action='store_true',
+    parser.add_argument('-boto', action='store_false',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
     parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
     parser.add_argument('-info', action='store_true', help='Show info on ES services')
+    parser.add_argument('-size', type=int, nargs='?', const=1, default=6,
+                        help='Maximum number of results (default: 6)')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
+    parser.add_argument('-zoid', type=int, nargs='?', const=2, default=2,
+                        help='Zoastrian Id (default: 2)')
     args = parser.parse_args()
     beg_time = time.time()
     if args.domains:
         try_aws_es_service_client(args)
 
-    esearch = get_elasticsearch_client(not args.env)
-    if esearch:
-        if args.info:
-            print("Elasticsearch client info:", esearch.info(), "\n")
-        results = search_index(esearch, args.index, args.query)
-        print_hits(results)
+    es_client = ElasticsearchClient(args.zoid, args.boto)
+    if args.info:
+        es_client.show_info()
+    results = es_client.search_index(args.query, max_size=args.size)
+    print_hits(results)
 
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
