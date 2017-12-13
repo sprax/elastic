@@ -173,8 +173,8 @@ def print_search_stats(results, maxlen=MAXLEN):
 def truncate(string, maxlen=MAXLEN):
     '''if string is longer than maxlen, truncate it and add ellipses'''
     if len(string) > maxlen:
-        return string[:maxlen] + "..."
-    return string
+        return string[:maxlen].replace("\n", " ") + "..."
+    return string.replace("\n", " ")
 
 
 ESResult = namedtuple('ESResult', 'hit_score doc_id entry_id')
@@ -206,19 +206,23 @@ def print_hits(results, min_score=0.0, maxlen=MAXLEN, verbose=1):
     '''Simple utility function to print results of a search query'''
     if results:
         print_search_stats(results)
+        max_score = results['hits']['max_score']
         for hit in results['hits']['hits']:
             # get created date for a repo and fallback to authored_date for a commit
             hit_score = hit['_score']
+            norm_score = hit_score / (1.0 + max_score)
+            trunc_text = truncate(hit['_source']['content'], maxlen)
             if hit_score >= min_score:
                 if verbose > 1:
-                    print('%8.4f\t%s\t%36s\t%36s' % (
+                    print('%7.3f\t%8.4f\t%s\t%36s\t%36s' % (
                         hit_score,
-                        truncate(hit['_source']['content'], maxlen),
+                        norm_score,
+                        trunc_text,
                         hit['_source']['kb_document_id'],
                         hit['_id']
                     ))
                 else:
-                    print('%8.4f\t%s' % (hit_score, truncate(hit['_source']['content'], maxlen)))
+                    print('%7.3f\t%8.4f\t%s' % (hit_score, norm_score, trunc_text))
         print('=' * maxlen)
     else:
         print("---- NO RESULTS ----")
