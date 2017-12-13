@@ -378,12 +378,17 @@ def main():
     parser.add_argument('-zoid', type=int, nargs='?', const=7777777, default=2,
                         help='Zoastrian Id (default: 2)')
     args = parser.parse_args()
+    if args.verbose > 7:
+        print("Type(args): ", type(args))
+        print(args)
+        exit(0)
+
     beg_time = time.time()
     if args.domains:
         try_aws_es_service_client(args)
 
     es_client = ElasticsearchClient(args.zoid, args.boto)
-    pdb.set_trace()
+    # pdb.set_trace()
     if args.info:
         es_client.show_info()
     elif args.create_index:
