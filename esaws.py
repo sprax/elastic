@@ -2,10 +2,11 @@
 # Sprax Lines       2017.12      Written for Python 3.5
 '''Elasticsearch with boto3'''
 
-from collections import namedtuple
 import argparse
-import time
+from collections import namedtuple
 import os
+import pdb
+import time
 #from dateutil.parser import parse as parse_date
 
 import boto3
@@ -228,6 +229,78 @@ def zot_index_name(zoid):
     return "bot{}".format(zoid)
 
 
+def create_index(elastic_search, index_name, doc_type):
+    '''
+    1)  For keywords: case-insensitive keywords with default AND operators (intersection),
+        light stemming. (query analyzed the same way).
+    2)  For phrases: with default semantic fuzziness of 1, not_analyzed,
+        and possibly with n-grams (query also not_analyzed).
+    '''
+    try:
+        res = elastic_search.indices.create(
+            index=index_name,
+            type=doc_type,
+            body={
+                "settings" : {
+                    "analysis" : {
+                        "analyzer" : {
+                            "case_sensitive_text" : {
+                                "kb_document" : "custom",
+                                "tokenizer" : "standard",
+                                "filter" : ["my_english_stemmer"] # ["standard", "my_stemmer"]
+                            }
+                        },
+                        "normalizer": {
+                            "lower_ascii_normalizer": {
+                                "type": "custom",
+                                "filter":  ["lowercase", "asciifolding"]
+                            }
+                        },
+                        "filter" : {
+                            "my_english_stemmer" : {
+                                "type" : "stemmer",
+                                "name" : "light_english"
+                            }
+                        }
+                    }
+                },
+                "mappings" : {
+                    "kb_document" : {
+                        "properties" : {
+                            "content" : {
+                                "type" : "text",
+                                "index" : "analyzed",
+                                "analyzer" : "standard",
+                                "store" : True,
+                                "term_vector" : "yes",
+                                "boost" : 3,
+                                "fields" : {
+                                    "raw" : {
+                                        "type" : "text",
+                                        "index" : "not_analyzed",
+                                        "analyzer" : "case_sensitive_text",
+                                        "store" : True,
+                                    }
+                                },
+                            },
+                            "kb_document_id" : {
+                                "store" : True,
+                                "type" : "string"
+                            }
+                        }
+                    }
+                },
+            }
+        )
+        print("create_index result:", res)
+    except Exception as ex:
+        # # ignore index_already_exists_exception
+        # if ex.message.contains("index_already_exists_exception"):
+        #     print("Ignoring index_already_exists_exception")
+        # else:
+        print("Exception in create_index:", ex)
+
+
 class ElasticsearchClient:
     '''Client for searching one Elasticsearch index and type'''
 
@@ -259,72 +332,28 @@ class ElasticsearchClient:
             return None
         return results
 
-    def create_index(self, index_name):
-        '''
-        1) for keywords: case-insensitive keywords with default AND operators (intersection), light stemming. (query analyzed the same way)
-        2) for phrases: with default semantic fuzziness of 1, not_analyzed, and possibly with n-grams (query also not_analyzed)
-        '''
-        try:
-            self.client.indices.create(index=index_name, type='kb_document',
-                body={
-                    "settings" : {
-                        "analysis" : {
-                            "analyzer" : {
-                                "case_sensitive_text" : {
-                                    "kb_document" : "custom",
-                                    "tokenizer" : "standard",
-                                    "filter" : ["my_english_stemmer"] # ["standard", "my_stemmer"]
-                                }
-                            },
-                            "normalizer": {
-                                "lower_ascii_normalizer": {
-                                    "type": "custom",
-                                    "filter":  [ "lowercase", "asciifolding" ]
-                                }
-                            },
-                            "filter" : {
-                                "my_english_stemmer" : {
-                                    "type" : "stemmer",
-                                    "name" : "light_english"
-                                }
-                            }
-                        }
-                    },
-                    "mappings" : {
-                        "kb_document" : {
-                            "properties" : {
-                                "content" : {
-                                    "type" : "text",
-                                    "index" : "analyzed",
-                                    "analyzer" : "standard",
-                                    "store" : True,
-                                    "term_vector" : "yes",
-                                    "boost" : 3,
-                                    "fields" : {
-                                        "raw" : {
-                                            "type" : "text",
-                                            "index" : "not_analyzed",
-                                            "analyzer" : "case_sensitive_text",
-                                            "store" : True,
-                                        }
-                                    },
-                                },
-                                "kb_document_id" : {
-                                    "store" : True,
-                                    "type" : "string"
-                                }
-                            }
-                        }
-                    },
-                }
-            )
-        except Exception as ex:
-            # # ignore index_already_exists_exception
-            # if ex.message.contains("index_already_exists_exception"):
-            #     print("Ignoring index_already_exists_exception")
-            # else:
-            print(ex)
+    def create_index(self, index_name=None, doc_type=None):
+        '''Creat (the default) index'''
+        if index_name is None:
+            index_name = self.index_name
+        if doc_type is None:
+            doc_type = self.doc_type
+        create_index(self.client, index_name, doc_type)
 
+    def delete_index(self, index_name=None, doc_type=None, **kwargs):
+        '''Delete an index (self.index_name by default)'''
+        if index_name is None:
+            index_name = self.index_name
+        if doc_type is None:
+            doc_type = self.doc_type
+        try:
+            return self.client.indices.delete(index=index_name, doc_type=doc_type, **kwargs)
+        except Exception as ex:
+            print("Elasticsearch error deleting index:", ex)
+        return None
+
+
+dummy_index = 'SelfIndex'
 
 def main():
     '''get args and try stuff'''
@@ -332,6 +361,7 @@ def main():
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
     parser.add_argument('-boto', action='store_false',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
+    parser.add_argument('-create_index', type=str, nargs='?', default=dummy_index, help='query type for search')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
     parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
@@ -353,10 +383,16 @@ def main():
         try_aws_es_service_client(args)
 
     es_client = ElasticsearchClient(args.zoid, args.boto)
+    pdb.set_trace()
     if args.info:
         es_client.show_info()
-    results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
-    print_hits(results, min_score=args.min_score)
+    elif args.create_index:
+        index_name = None if args.create_index == dummy_index else args.create_index
+        print("======> create_index(%s)" % index_name)
+        es_client.create_index(index_name)
+    else:
+        results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
+        print_hits(results, min_score=args.min_score)
 
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
