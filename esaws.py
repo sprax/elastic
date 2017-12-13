@@ -11,18 +11,13 @@ import os
 import boto3
 import botocore
 # import requests
-
-# from aws_requests_auth.exceptions import NoSecretKeyError
-# from aws_requests_auth.boto_utils import AWSRequestsAuth
 from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
 from requests_aws4auth import AWS4Auth
 
-# from elasticsearch import Connection
 from elasticsearch import Elasticsearch
 from elasticsearch import RequestsHttpConnection
 from elasticsearch.exceptions import TransportError
 
-# from urllib.parse import urlparse
 
 
 def match_query(qstring):
@@ -179,7 +174,7 @@ def truncate(string, maxlen=MAXLEN):
 
 ESResult = namedtuple('ESResult', 'hit_score doc_id entry_id')
 
-def extract_scores_and_ids(index_name, qstring, results, threshold):
+def extract_scores_and_ids(index_name, qstring, results, min_score):
     '''
     Convert raw Elasticsearch results into simple tuples.
     '''
@@ -189,7 +184,7 @@ def extract_scores_and_ids(index_name, qstring, results, threshold):
             max_score = results['hits']['max_score']
             for hit in results['hits']['hits']:
                 score = hit['_score']
-                if score >= threshold:
+                if score >= min_score:
                     sum_score += score
                     kb_entry_id = hit['_id']
                     source = hit['_source']
@@ -264,12 +259,77 @@ class ElasticsearchClient:
             return None
         return results
 
+    def create_index(self, index_name):
+        '''
+        1) for keywords: case-insensitive keywords with default AND operators (intersection), light stemming. (query analyzed the same way)
+        2) for phrases: with default semantic fuzziness of 1, not_analyzed, and possibly with n-grams (query also not_analyzed)
+        '''
+        try:
+            self.client.indices.create(index=index_name, type='kb_document',
+                body={
+                    "settings" : {
+                        "analysis" : {
+                            "analyzer" : {
+                                "case_sensitive_text" : {
+                                    "kb_document" : "custom",
+                                    "tokenizer" : "standard",
+                                    "filter" : ["my_english_stemmer"] # ["standard", "my_stemmer"]
+                                }
+                            },
+                            "normalizer": {
+                                "lower_ascii_normalizer": {
+                                    "type": "custom",
+                                    "filter":  [ "lowercase", "asciifolding" ]
+                                }
+                            },
+                            "filter" : {
+                                "my_english_stemmer" : {
+                                    "type" : "stemmer",
+                                    "name" : "light_english"
+                                }
+                            }
+                        }
+                    },
+                    "mappings" : {
+                        "kb_document" : {
+                            "properties" : {
+                                "content" : {
+                                    "type" : "text",
+                                    "index" : "analyzed",
+                                    "analyzer" : "standard",
+                                    "store" : True,
+                                    "term_vector" : "yes",
+                                    "boost" : 3,
+                                    "fields" : {
+                                        "raw" : {
+                                            "type" : "text",
+                                            "index" : "not_analyzed",
+                                            "analyzer" : "case_sensitive_text",
+                                            "store" : True,
+                                        }
+                                    },
+                                },
+                                "kb_document_id" : {
+                                    "store" : True,
+                                    "type" : "string"
+                                }
+                            }
+                        }
+                    },
+                }
+            )
+        except Exception as ex:
+            # # ignore index_already_exists_exception
+            # if ex.message.contains("index_already_exists_exception"):
+            #     print("Ignoring index_already_exists_exception")
+            # else:
+            print(ex)
+
 
 def main():
     '''get args and try stuff'''
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
-    parser.add_argument('type', type=str, nargs='?', default='most_fields_query', help='query type for search')
     parser.add_argument('-boto', action='store_false',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
@@ -280,8 +340,9 @@ def main():
                         help='Offset into results list (default: 0)')
     parser.add_argument('-size', type=int, nargs='?', const=5, default=6,
                         help='Maximum number of results (default: 6)')
-    parser.add_argument('-threshold', type=float, nargs='?', const=1.0, default=0.0,
+    parser.add_argument('-min_score', type=float, nargs='?', const=1.0, default=0.0,
                         help='Minimum score for result hits (default: 0.0)')
+    parser.add_argument('-type', type=str, nargs='?', default='most_fields_query', help='query type for search')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
     parser.add_argument('-zoid', type=int, nargs='?', const=7777777, default=2,
@@ -295,7 +356,7 @@ def main():
     if args.info:
         es_client.show_info()
     results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
-    print_hits(results, min_score=args.threshold)
+    print_hits(results, min_score=args.min_score)
 
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
