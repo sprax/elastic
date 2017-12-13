@@ -268,7 +268,6 @@ class ElasticsearchClient:
 def main():
     '''get args and try stuff'''
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
-    parser.add_argument('index', type=str, nargs='?', default='bot2', help='Elasticsearch index to use')
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
     parser.add_argument('type', type=str, nargs='?', default='most_fields_query', help='query type for search')
     parser.add_argument('-boto', action='store_false',
@@ -285,7 +284,7 @@ def main():
                         help='Minimum score for result hits (default: 0.0)')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
-    parser.add_argument('-zoid', type=int, nargs='?', const=2, default=2,
+    parser.add_argument('-zoid', type=int, nargs='?', const=7777777, default=2,
                         help='Zoastrian Id (default: 2)')
     args = parser.parse_args()
     beg_time = time.time()
