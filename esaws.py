@@ -391,7 +391,7 @@ class ElasticsearchClient:
 
 
 ###############################################################################
-def do_es_command(es_client, args):
+def do_es_command(es_client, dummy_index, args):
     '''Execute an Elasticsearch command'''
     if args.version:
         es_client.show_info()
@@ -449,7 +449,7 @@ def main():
 
     beg_time = time.time()
     es_client = ElasticsearchClient(args.zoid, args.boto)
-    do_es_command(es_client, args)
+    do_es_command(es_client, dummy_index, args)
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
 
