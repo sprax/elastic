@@ -391,6 +391,24 @@ class ElasticsearchClient:
 
 
 ###############################################################################
+def do_es_command(es_client, args):
+    '''Execute an Elasticsearch command'''
+    if args.version:
+        es_client.show_info()
+    elif args.create_index:
+        index_name = None if args.create_index == dummy_index else args.create_index
+        print("======> create_index(%s)" % index_name)
+        es_client.create_index(index_name)
+    elif args.delete_index:
+        index_name = None if args.delete_index == dummy_index else args.delete_index
+        print("======> delete_index(%s)" % index_name)
+        es_client.delete_index(index_name)
+    else:
+        print("======> search_index(%s, %s)" % (es_client.index_name, args.query))
+        results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
+        print_hits(results, min_score=args.min_score)
+
+
 def main():
     '''get args and try stuff'''
     dummy_index = 'SelfIndex'
@@ -426,26 +444,12 @@ def main():
         print(args)
         exit(0)
 
-    beg_time = time.time()
     if args.domains:
         try_aws_es_service_client(args)
 
+    beg_time = time.time()
     es_client = ElasticsearchClient(args.zoid, args.boto)
-    # pdb.set_trace()
-    if args.version:
-        es_client.show_info()
-    elif args.create_index:
-        index_name = None if args.create_index == dummy_index else args.create_index
-        print("======> create_index(%s)" % index_name)
-        es_client.create_index(index_name)
-    elif args.delete_index:
-        index_name = None if args.delete_index == dummy_index else args.delete_index
-        print("======> delete_index(%s)" % index_name)
-        es_client.delete_index(index_name)
-    else:
-        results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
-        print_hits(results, min_score=args.min_score)
-
+    do_es_command(es_client, args)
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
 
