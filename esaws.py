@@ -226,7 +226,7 @@ def print_hits(results, min_score=0.0, maxlen=MAXLEN, verbose=1):
 
 def zot_index_name(zot_id):
     '''get Elasticsearch index name from zot_id'''
-    return "bot{}".format(zot_id)
+    return "zot{}".format(zot_id)
 
 
 def kb_document_mappings():
@@ -366,20 +366,25 @@ class ElasticsearchClient:
                 print("ElasticsearchClient.create_index: exception:", ex)
         return False
 
-    def index_all_docs(self, zot_id=None, index_name=None, **kwargs):
-        '''Fully reindexes a bot's kb_documents, where a kb_document may contain knowledge tags
-        NOTE: if we change the indexing scheme, old indices should be deleted, not updated in place.
-        Inconsistent indices may cause strange search results.
-        @param bot [Bot] The bot to re-index
+    def index_all_docs(self, zot_id=None, index_name=None, docs=None, **kwargs):
+        '''
+        Creates or updates the index for zot_id by indexing all the specifed docs.
+        NOTE: if you change the indexing scheme, old indices should be deleted,
+        not updated in place.  Inconsistent indices may cause strange search results.
         '''
         if zot_id is None:
             zot_id = self.zot_id
         if index_name is None:
             index_name = self.index_name
+        if docs is None:
+            docs = []
+        if not docs:
+            print("==== index_all_doc: Nothing to index! ====")
+            return False
         try:
             self.create_index(index_name)
             entry_hashes = []
-            for doc in bot.kb_documents:
+            for doc in docs:
                 entry_hashes += make_entry_hashes(index_name, doc)
             result = self.client.bulk(body=entry_hashes)
             pdb.set_trace()
@@ -396,9 +401,7 @@ class ElasticsearchClient:
 ###############################################################################
 def do_es_command(es_client, dummy_index, args):
     '''Execute an Elasticsearch command'''
-    if args.version:
-        es_client.show_info()
-    elif args.create_index:
+    if args.create_index:
         index_name = None if args.create_index == dummy_index else args.create_index
         print("======> create_index(%s)" % index_name)
         es_client.create_index(index_name)
@@ -406,11 +409,13 @@ def do_es_command(es_client, dummy_index, args):
         index_name = None if args.delete_index == dummy_index else args.delete_index
         print("======> delete_index(%s)" % index_name)
         es_client.delete_index(index_name)
+    elif args.elastic:
+        es_client.show_info()
     elif args.index_all:
-        zot_id = args.zot_id if args.zot_id else es_client.zot_id
-        ixname = args.name if args.name else es_client.index_name
-        print("======> index_all_docs(%d, %s)" % index_id, ixname)
-        es_client.index_all_docs(zot_id, ixname)
+        zoid = args.zoid if args.zoid else es_client.zot_id
+        name = args.name if args.name else es_client.index_name
+        print("======> index_all_docs(%d, %s)" % (zoid, name))
+        es_client.index_all_docs(zoid, name)
     else:
         print("======> search_index(%s, %s)" % (es_client.index_name, args.query))
         results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
@@ -420,8 +425,8 @@ def do_es_command(es_client, dummy_index, args):
 def main():
     '''get args and try stuff'''
     dummy_index = 'SelfIndex'
-    default_id = 2
-    const_zoid = 7777777
+    const_zoid, default_zoid = 2, 7777777
+    const_name, default_name = zot_index_name(const_zoid), zot_index_name(default_zoid)
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
     parser.add_argument('-boto', action='store_false',
@@ -433,9 +438,10 @@ def main():
     parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
     parser.add_argument('-elastic', '-V', action='store_true', help='Show Elasticsearch config info')
     parser.add_argument('-index_all', action='store_true', help='Index all docs for ID (const: %d, default: %d)'
-                        % (const_zoid, default_id))
+                        % (const_zoid, default_zoid))
     parser.add_argument('-min_score', metavar='MIN', type=float, nargs='?', const=1.0, default=0.0,
                         help='Minimum score for result hits (default: 0.0)')
+    parser.add_argument('-name', type=str, nargs='?', const=const_name, default=default_name, help='index name to use')
     parser.add_argument('-offset', type=int, nargs='?', const=1, default=0,
                         help='Offset into results list (default: 0)')
     parser.add_argument('-size', type=int, nargs='?', const=5, default=6,
@@ -443,8 +449,8 @@ def main():
     parser.add_argument('-type', type=str, nargs='?', default='most_fields_query', help='query type for search')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
-    parser.add_argument('-zot_id', metavar='ID', type=int, nargs='?', const=const_zoid, default=default_id,
-                        help='Zoroastrian ID (const: %d, default: %d)' % (const_zoid, default_id))
+    parser.add_argument('-zoid', metavar='ID', type=int, nargs='?', const=const_zoid, default=default_zoid,
+                        help='Zoroastrian ID (const: %d, default: %d)' % (const_zoid, default_zoid))
     args = parser.parse_args()
     if args.verbose > 7:
         print("Type(args): ", type(args))
@@ -455,7 +461,7 @@ def main():
         try_aws_es_service_client(args)
 
     beg_time = time.time()
-    es_client = ElasticsearchClient(args.zot_id, args.boto)
+    es_client = ElasticsearchClient(args.zoid, args.boto)
     do_es_command(es_client, dummy_index, args)
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
