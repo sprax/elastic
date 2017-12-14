@@ -159,7 +159,7 @@ MAXLEN = 80
 
 def print_search_stats(results, maxlen=MAXLEN):
     '''print number and latency of results'''
-    if results:
+    if results and len(results['hits']['hits']) > 0:
         print('=' * maxlen)
         hit = results['hits']['hits'][0]
         print('Found %d total hits of type %s in index %s in %d ms'
@@ -232,34 +232,31 @@ def zot_index_name(zoid):
 def kb_document_mappings():
     '''Default type mappings for kb_documents'''
     return {
-        "mappings" : {
-            "kb_document" : {
-                "properties" : {
-                    "content" : {
-                        "type" : "text",
-                        "index" : "analyzed",
-                        "analyzer" : "standard",
-                        "store" : True,
-                        "term_vector" : "yes",
-                        "boost" : 3,
-                        "fields" : {
-                            "raw" : {
-                                "type" : "text",
-                                "index" : "not_analyzed",
-                                "analyzer" : "case_sensitive_text",
-                                "store" : True,
-                            }
-                        },
+        "kb_document" : {
+            "properties" : {
+                "content" : {
+                    "type" : "text",
+                    "index" : "analyzed",
+                    "analyzer" : "standard",
+                    "store" : True,
+                    "term_vector" : "yes",
+                    "boost" : 3,
+                    "fields" : {
+                        "raw" : {
+                            "type" : "text",
+                            "index" : "not_analyzed",
+                            "analyzer" : "case_sensitive_text",
+                            "store" : True,
+                        }
                     },
-                    "kb_document_id" : {
-                        "store" : True,
-                        "type" : "string"
-                    }
+                },
+                "kb_document_id" : {
+                    "store" : True,
+                    "type" : "string"
                 }
             }
         }
     }
-
 
 
 def create_index(elastic_search, index_name, type_mappings=None):
@@ -271,7 +268,7 @@ def create_index(elastic_search, index_name, type_mappings=None):
     '''
     if type_mappings is None:
         type_mappings = kb_document_mappings()
-    res = elastic_search.indices.create(
+    return elastic_search.indices.create(
         index=index_name,
         body={
             "settings" : {
@@ -297,11 +294,9 @@ def create_index(elastic_search, index_name, type_mappings=None):
                     }
                 }
             },
-            "mappings" : type_mappings
+            "mappings" : kb_document_mappings(),
         }
     )
-    pdb.set_trace()
-    print("create_index result:", res)
 
 
 class ElasticsearchClient:
@@ -345,26 +340,31 @@ class ElasticsearchClient:
         if index_name is None:
             index_name = self.index_name
         try:
-            create_index(self.client, index_name, type_mappings)
+            result = create_index(self.client, index_name, type_mappings)
+            return result['acknowledged'] and result['shards_acknowledged']
         except TransportError as ex:
             # ignore index_already_exists_exception
             if "index_already_exists_exception" in ex.error:
                 print("ElasticsearchClient.create_index: Ignoring index_already_exists_exception")
             else:
                 print("ElasticsearchClient.create_index: exception:", ex)
+        return False
 
 
-    def delete_index(self, index_name=None, doc_type=None, **kwargs):
+    def delete_index(self, index_name=None, **kwargs):
         '''Delete an index (self.index_name by default)'''
         if index_name is None:
             index_name = self.index_name
-        if doc_type is None:
-            doc_type = self.doc_type
         try:
-            return self.client.indices.delete(index=index_name, doc_type=doc_type, **kwargs)
-        except Exception as ex:
-            print("Elasticsearch error deleting index:", ex)
-        return None
+            result = self.client.indices.delete(index=index_name, **kwargs)
+            return result['acknowledged']
+        except TransportError as ex:
+            # ignore index_already_exists_exception
+            if "index_not_found_exception" in ex.error:
+                print("ElasticsearchClient.create_index: Ignoring index_not_found_exception")
+            else:
+                print("ElasticsearchClient.create_index: exception:", ex)
+        return False
 
 
 dummy_index = 'SelfIndex'
@@ -375,7 +375,8 @@ def main():
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
     parser.add_argument('-boto', action='store_false',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
-    parser.add_argument('-create_index', type=str, nargs='?', const=dummy_index, help='query type for search')
+    parser.add_argument('-create_index', type=str, nargs='?', const=dummy_index, help='create named index')
+    parser.add_argument('-delete_index', type=str, nargs='?', const=dummy_index, help='delete named index')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
     parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
@@ -409,6 +410,10 @@ def main():
         index_name = None if args.create_index == dummy_index else args.create_index
         print("======> create_index(%s)" % index_name)
         es_client.create_index(index_name)
+    elif args.delete_index:
+        index_name = None if args.delete_index == dummy_index else args.delete_index
+        print("======> delete_index(%s)" % index_name)
+        es_client.delete_index(index_name)
     else:
         results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
         print_hits(results, min_score=args.min_score)
