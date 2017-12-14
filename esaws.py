@@ -224,9 +224,9 @@ def print_hits(results, min_score=0.0, maxlen=MAXLEN, verbose=1):
         print("---- NO RESULTS ----")
 
 
-def zot_index_name(zoid):
-    '''get Elasticsearch index name from zoid'''
-    return "bot{}".format(zoid)
+def zot_index_name(zot_id):
+    '''get Elasticsearch index name from zot_id'''
+    return "bot{}".format(zot_id)
 
 
 def kb_document_mappings():
@@ -302,11 +302,12 @@ def create_index(elastic_search, index_name, type_mappings=None):
 class ElasticsearchClient:
     '''Client for searching one Elasticsearch index and type'''
 
-    def __init__(self, zoid, use_boto=True, doc_type='kb_document'):
+    def __init__(self, zot_id, use_boto=True, doc_type='kb_document'):
         '''Save the client, index, and type'''
         self.use_boto = use_boto
         self.client = get_elasticsearch_client(use_boto)
-        self.index_name = zot_index_name(zoid)
+        self.zot_id = zot_id
+        self.index_name = zot_index_name(zot_id)
         self.doc_type = doc_type
 
     def show_info(self):
@@ -365,12 +366,14 @@ class ElasticsearchClient:
                 print("ElasticsearchClient.create_index: exception:", ex)
         return False
 
-    def index_all_kb_documents(self, index_name=None, **kwargs):
+    def index_all_docs(self, zot_id=None, index_name=None, **kwargs):
         '''Fully reindexes a bot's kb_documents, where a kb_document may contain knowledge tags
         NOTE: if we change the indexing scheme, old indices should be deleted, not updated in place.
         Inconsistent indices may cause strange search results.
         @param bot [Bot] The bot to re-index
         '''
+        if zot_id is None:
+            zot_id = self.zot_id
         if index_name is None:
             index_name = self.index_name
         try:
@@ -403,6 +406,11 @@ def do_es_command(es_client, dummy_index, args):
         index_name = None if args.delete_index == dummy_index else args.delete_index
         print("======> delete_index(%s)" % index_name)
         es_client.delete_index(index_name)
+    elif args.index_all:
+        zot_id = args.zot_id if args.zot_id else es_client.zot_id
+        ixname = args.name if args.name else es_client.index_name
+        print("======> index_all_docs(%d, %s)" % index_id, ixname)
+        es_client.index_all_docs(zot_id, ixname)
     else:
         print("======> search_index(%s, %s)" % (es_client.index_name, args.query))
         results = es_client.search_index(args.query, offset=args.offset, max_size=args.size)
@@ -423,8 +431,8 @@ def main():
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
     parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
-    parser.add_argument('-index', metavar='ID', type=int, nargs='?', const=const_zoid, default=default_id,
-                        help='index all docs for ID (const: %d, default: %d)'
+    parser.add_argument('-elastic', '-V', action='store_true', help='Show Elasticsearch config info')
+    parser.add_argument('-index_all', action='store_true', help='Index all docs for ID (const: %d, default: %d)'
                         % (const_zoid, default_id))
     parser.add_argument('-min_score', metavar='MIN', type=float, nargs='?', const=1.0, default=0.0,
                         help='Minimum score for result hits (default: 0.0)')
@@ -435,9 +443,8 @@ def main():
     parser.add_argument('-type', type=str, nargs='?', default='most_fields_query', help='query type for search')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
-    parser.add_argument('-version', '-V', action='store_true', help='Show info on ES services')
-    parser.add_argument('-zoid', metavar='ID', type=int, nargs='?', const=const_zoid, default=default_id,
-                        help='Zoastrian ID (const: %d, default: %d)' % (const_zoid, default_id))
+    parser.add_argument('-zot_id', metavar='ID', type=int, nargs='?', const=const_zoid, default=default_id,
+                        help='Zoroastrian ID (const: %d, default: %d)' % (const_zoid, default_id))
     args = parser.parse_args()
     if args.verbose > 7:
         print("Type(args): ", type(args))
@@ -448,7 +455,7 @@ def main():
         try_aws_es_service_client(args)
 
     beg_time = time.time()
-    es_client = ElasticsearchClient(args.zoid, args.boto)
+    es_client = ElasticsearchClient(args.zot_id, args.boto)
     do_es_command(es_client, dummy_index, args)
     end_time = time.time()
     print("Elapsed time: %d seconds" % (end_time - beg_time))
