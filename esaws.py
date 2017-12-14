@@ -336,7 +336,7 @@ class ElasticsearchClient:
 
 
     def create_index(self, index_name=None, type_mappings=None):
-        '''Creat (the default) index'''
+        '''Create an index (self.index_name by default)'''
         if index_name is None:
             index_name = self.index_name
         try:
@@ -349,7 +349,6 @@ class ElasticsearchClient:
             else:
                 print("ElasticsearchClient.create_index: exception:", ex)
         return False
-
 
     def delete_index(self, index_name=None, **kwargs):
         '''Delete an index (self.index_name by default)'''
@@ -366,32 +365,61 @@ class ElasticsearchClient:
                 print("ElasticsearchClient.create_index: exception:", ex)
         return False
 
+    def index_all_kb_documents(self, index_name=None, **kwargs):
+        '''Fully reindexes a bot's kb_documents, where a kb_document may contain knowledge tags
+        NOTE: if we change the indexing scheme, old indices should be deleted, not updated in place.
+        Inconsistent indices may cause strange search results.
+        @param bot [Bot] The bot to re-index
+        '''
+        if index_name is None:
+            index_name = self.index_name
+        try:
+            self.create_index(index_name)
+            entry_hashes = []
+            for doc in bot.kb_documents:
+                entry_hashes += make_entry_hashes(index_name, doc)
+            result = self.client.bulk(body=entry_hashes)
+            pdb.set_trace()
+            return result['acknowledged']
+        except TransportError as ex:
+            # ignore index_already_exists_exception
+            if "index_not_found_exception" in ex.error:
+                print("ElasticsearchClient.create_index: Ignoring index_not_found_exception")
+            else:
+                print("ElasticsearchClient.create_index: exception:", ex)
+        return False
 
-dummy_index = 'SelfIndex'
 
+###############################################################################
 def main():
     '''get args and try stuff'''
+    dummy_index = 'SelfIndex'
+    default_id = 2
+    const_zoid = 7777777
     parser = argparse.ArgumentParser(description="Drive boto3 Elasticsearch client")
     parser.add_argument('query', type=str, nargs='?', default='IT', help='query string for search')
     parser.add_argument('-boto', action='store_false',
                         help='Use ENV variables instead of reading AWS credentials from file (boto)')
-    parser.add_argument('-create_index', type=str, nargs='?', const=dummy_index, help='create named index')
-    parser.add_argument('-delete_index', type=str, nargs='?', const=dummy_index, help='delete named index')
+    parser.add_argument('-create_index', metavar='NAME', type=str, nargs='?', const=dummy_index, help='create named index')
+    parser.add_argument('-delete_index', metavar='NAME', type=str, nargs='?', const=dummy_index, help='delete named index')
     parser.add_argument('-describe', action='store_true', help='Describe available ES clients')
     parser.add_argument('-dir', action='store_true', help='Show directory of client methods')
     parser.add_argument('-domains', action='store_true', help='List available ES domains (boto)')
-    parser.add_argument('-info', action='store_true', help='Show info on ES services')
+    parser.add_argument('-index', metavar='ID', type=int, nargs='?', const=const_zoid, default=default_id,
+                        help='index all docs for ID (const: %d, default: %d)'
+                        % (const_zoid, default_id))
+    parser.add_argument('-min_score', metavar='MIN', type=float, nargs='?', const=1.0, default=0.0,
+                        help='Minimum score for result hits (default: 0.0)')
     parser.add_argument('-offset', type=int, nargs='?', const=1, default=0,
                         help='Offset into results list (default: 0)')
     parser.add_argument('-size', type=int, nargs='?', const=5, default=6,
                         help='Maximum number of results (default: 6)')
-    parser.add_argument('-min_score', type=float, nargs='?', const=1.0, default=0.0,
-                        help='Minimum score for result hits (default: 0.0)')
     parser.add_argument('-type', type=str, nargs='?', default='most_fields_query', help='query type for search')
     parser.add_argument('-verbose', type=int, nargs='?', const=1, default=1,
                         help='Verbosity of output (default: 1)')
-    parser.add_argument('-zoid', type=int, nargs='?', const=7777777, default=2,
-                        help='Zoastrian Id (default: 2)')
+    parser.add_argument('-version', '-V', action='store_true', help='Show info on ES services')
+    parser.add_argument('-zoid', metavar='ID', type=int, nargs='?', const=const_zoid, default=default_id,
+                        help='Zoastrian ID (const: %d, default: %d)' % (const_zoid, default_id))
     args = parser.parse_args()
     if args.verbose > 7:
         print("Type(args): ", type(args))
@@ -404,7 +432,7 @@ def main():
 
     es_client = ElasticsearchClient(args.zoid, args.boto)
     # pdb.set_trace()
-    if args.info:
+    if args.version:
         es_client.show_info()
     elif args.create_index:
         index_name = None if args.create_index == dummy_index else args.create_index
