@@ -2,9 +2,9 @@
 # See: https://stackoverflow.com/questions/17029902/using-curl-post-with-variables-defined-in-bash-script-functions
 
 query_type=analyze
-query_text=${1:-"YeLLoWing café beLLows slept FURIOUSly."}
+query_text=${1:-"The YeLLoWing café beLLows slept FURIOUSly."}
 prettybool=${2:-true}
-do_explain=${3:-true}
+do_explain=${3:-false}
 def_field1=${4:-description}
 def_field2=${5:-name}
 tokenizer1=${6:-standard}
@@ -14,7 +14,7 @@ gen_data()
 cat <<EOF
 {
     "tokenizer": "$tokenizer1",
-    "filter":  [ "lowercase", "asciifolding" ],
+    "filter":  [ "lowercase", "asciifolding", {"type": "stop", "stopwords": ["a", "is", "the"]}],
     "text": "$query_text",
     "explain" : "$do_explain"
 }
