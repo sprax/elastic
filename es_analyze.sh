@@ -30,18 +30,14 @@ EOF
 
 gen_text()  # no comma after the text
 {
-cat <<EOF
-{
-    "text": "$query_text"
-}
-EOF
+    echo "{ \"text\": \"$query_text\" }"
 } 
-
-# # override index's analyzer settings (observe the stemming):
-# curl "http://localhost:9200/get-together/_analyze?pretty=$prettytrue\&analyzer=english " -d "$(gen_text)"
 
 # # supply a named analyzer without an index (observe the stemming)
 # curl "http://localhost:9200/_analyze?pretty=$prettytrue\&analyzer=english " -d "$(gen_text)"
+
+# # override index's analyzer settings (observe the stemming):
+# curl "http://localhost:9200/get-together/_analyze?pretty=$prettytrue\&analyzer=english " -d "$(gen_text)"
 
 # # use the index's analyzer (observe lowercase)
 # curl "http://localhost:9200/get-together/_analyze?pretty=$prettytrue" -d "$(gen_text)"
