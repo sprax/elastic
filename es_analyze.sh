@@ -2,7 +2,7 @@
 # See: https://stackoverflow.com/questions/17029902/using-curl-post-with-variables-defined-in-bash-script-functions
 
 operations=analyze
-query_text=${1:-"The YeLLoWing café beLLows slept FURIOUSly."}
+query_text=${1:-"The YeLLoWing café beLLows was sleeping FURIOUSly."}
 prettytrue=${2:-true}
 porterstem=${3:-true}
 do_explain=${4:-false}
