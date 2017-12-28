@@ -5,6 +5,8 @@ import json
 import requests
 import urllib
 
+PRETTY = "true"
+
 # operations=analyze
 # query_text=${1:-"The YeLLoWing café beLLows MiCe were sleeping FURIOUSly."}
 # prettytrue=${2:-true}
@@ -72,10 +74,35 @@ def json_text(text_to_analyze=DEFAULT_TEXT):
 #
 # For your specific curl translation:
 
-PRETTY = "true"
-url = "http://localhost:9200/_analyze?pretty=%s" % PRETTY
-payload = json_text()   # json_data()
-headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-results = requests.post(url, data=payload, headers=headers)
+def post_es(payload=None, pretty=PRETTY, verbose=0):
+    '''post request to Elasticsearch'''
+    url = "http://localhost:9200/_analyze?pretty=%s" % pretty
+    payload = payload if payload else json_text()  # json_data()
+    headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+    results = requests.post(url, data=payload, headers=headers)
+    if verbose:
+        print("post_es got results of type(%s): (%s)" % (type(results).__name__, results))
+    return results
 
-print(results)
+def urlopen_es(payload=None, pretty=PRETTY, text="fishing", verbose=0):
+    '''Send request to Elasticsearch using urlopen'''
+    # esa_url = r"http://localhost:9200/_analyze?pretty=%s&analyzer=english&text=%s" % (pretty, text)
+    esa_url = r"http://localhost:9200"
+    res_byt = urllib.request.urlopen(esa_url).read()
+    if verbose > 1:
+        print("urlopen_es got results of type(%s): (%s)" % (type(res_byt).__name__, res_byt))
+    res_str = res_byt.decode('utf-8')
+    res_dct = json.loads(res_str)
+    if verbose > 0:
+        print("urlopen_es results after .decode('utf-8') and json.loads to dict:\n(%s)" % res_dct)
+    return res_dct
+
+
+
+post_res = post_es()
+print("post_es results:")
+print(post_res)
+print()
+open_res = urlopen_es()
+print("urlopen_es results:")
+print(open_res)
