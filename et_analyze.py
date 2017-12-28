@@ -1,37 +1,47 @@
-#!/usr/local/bin/bash
-# See: https://stackoverflow.com/questions/17029902/using-curl-post-with-variables-defined-in-bash-script-functions
+#!/usr/bin/env python3
+'''pyton translation of es_analyze.sh'''
 
-operations=analyze
-query_text=${1:-"The YeLLoWing café beLLows MiCe were sleeping FURIOUSly."}
-prettytrue=${2:-true}
-porterstem=${3:-true}
-do_explain=${4:-false}
-tokenizer1=${5:-standard}
+import json
+import requests
+import urllib
+
+# operations=analyze
+# query_text=${1:-"The YeLLoWing café beLLows MiCe were sleeping FURIOUSly."}
+# prettytrue=${2:-true}
+# porterstem=${3:-true}
+# do_explain=${4:-false}
+# tokenizer1=${5:-standard}
+def show_vars():
+    print("operations: $operations")
+    print("query_text: $query_text")
+    print("prettytrue: $prettytrue")
+    print("porterstem: $porterstem")
+    print("tokenizer1: $tokenizer1")
+    print("do_explain: $do_explain")
 
 # NOTES: filters are applied in the order listed, so stemming exceptions (keywords)
 # and overrides must be listed before the stemmer, and overrides that convert other
 # words into to stop words should precede stopword removal.
-gen_data()
-{
-cat <<EOF
-{
-    "tokenizer": "$tokenizer1",
-    "filter": [ "lowercase", "asciifolding",
-                {"type": "keyword_marker", "keywords": ["sleeping"]},
-                {"type": "stemmer_override", "rules": [ "mice=>mouse", "were=>was"]},
-                {"type": "stop", "stopwords": ["a", "is", "the", "was"]},
-                "porter_stem"
-              ],
-    "text": "$query_text",
-    "explain": "$do_explain"
-}
-EOF
-}
+def json_data(query_text, tokenizer="standard", do_explain=False):
+    '''data payload as JSON string'''
+    explain = "true" if do_explain else "false"
+    return '''{
+        "tokenizer": "%s",
+        "filter": [ "lowercase", "asciifolding",
+                    {"type": "keyword_marker", "keywords": ["sleeping"]},
+                    {"type": "stemmer_override", "rules": [ "mice=>mouse", "were=>was"]},
+                    {"type": "stop", "stopwords": ["a", "is", "the", "was"]},
+                    "porter_stem"
+                  ],
+        "text": "%s",
+        "explain": "%s"
+    }
+    ''' % (query_text, tokenizer, explain)
 
-gen_text()  # no comma after the text
-{
-    echo "{ \"text\": \"$query_text\" }"
-}
+def json_text(text_to_analyze):
+    '''no comma after the text'''
+    return "{ \"text\": \"%s\" }" % text_to_analyze
+
 
 # # supply a named analyzer without an index (observe the stemming)
 # curl "http://localhost:9200/_analyze?pretty=$prettytrue\&analyzer=english " -d "$(gen_text)"
@@ -60,16 +70,7 @@ EDIT:
 
 For your specific curl translation:
 
-import requests, json
 url = 'https://www.googleapis.com/qpxExpress/v1/trips/search?key=mykeyhere'
 payload = open("request.json")
 headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
 r = requests.post(url, data=payload, headers=headers)
-
-echo
-echo "operations: $operations"
-echo "query_text: $query_text"
-echo "prettytrue: $prettytrue"
-echo "porterstem: $porterstem"
-echo "tokenizer1: $tokenizer1"
-echo "do_explain: $do_explain"
