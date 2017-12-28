@@ -19,10 +19,12 @@ def show_vars():
     print("tokenizer1: $tokenizer1")
     print("do_explain: $do_explain")
 
+DEFAULT_TEXT = "The YeLLoWing café beLLows MiCe were sleeping FURIOUSly."
+
 # NOTES: filters are applied in the order listed, so stemming exceptions (keywords)
 # and overrides must be listed before the stemmer, and overrides that convert other
 # words into to stop words should precede stopword removal.
-def json_data(query_text, tokenizer="standard", do_explain=False):
+def json_data(query_text=DEFAULT_TEXT, tokenizer="standard", do_explain=False):
     '''data payload as JSON string'''
     explain = "true" if do_explain else "false"
     return '''{
@@ -38,7 +40,7 @@ def json_data(query_text, tokenizer="standard", do_explain=False):
     }
     ''' % (query_text, tokenizer, explain)
 
-def json_text(text_to_analyze):
+def json_text(text_to_analyze=DEFAULT_TEXT):
     '''no comma after the text'''
     return "{ \"text\": \"%s\" }" % text_to_analyze
 
@@ -52,25 +54,28 @@ def json_text(text_to_analyze):
 # # use the index's analyzer (observe lowercase)
 # curl "http://localhost:9200/get-together/_analyze?pretty=$prettytrue" -d "$(gen_text)"
 
-# supply analyzer and text in the data
-def get_out():
-    '''
-    curl -XPOST "localhost:9200/_analyze?pretty=$prettytrue" -H 'Content-Type: application/json' -d "$(gen_data)"
-    '''
-    output = urllib.request.urlopen('http://www.somewebsite.com').read()
+# # supply analyzer and text in the data
+# def get_out():
+#     '''
+#     curl -XPOST "localhost:9200/_analyze?pretty=$prettytrue" -H 'Content-Type: application/json' -d "$(gen_data)"
+#     '''
+#     output = urllib.request.urlopen('http://www.somewebsite.com').read()
+#
+#
+# '''https://stackoverflow.com/questions/25491090/how-to-use-python-to-execute-a-curl-command'''
+# import requests
+# r = requests.get('https://github.com/timeline.json')
+# r.json()
+# If you look for further information, in the Quickstart section, they have lots of working examples.
+#
+# EDIT:
+#
+# For your specific curl translation:
 
-
-'''https://stackoverflow.com/questions/25491090/how-to-use-python-to-execute-a-curl-command'''
-import requests
-r = requests.get('https://github.com/timeline.json')
-r.json()
-If you look for further information, in the Quickstart section, they have lots of working examples.
-
-EDIT:
-
-For your specific curl translation:
-
-url = 'https://www.googleapis.com/qpxExpress/v1/trips/search?key=mykeyhere'
-payload = open("request.json")
+PRETTY = "true"
+url = "http://localhost:9200/_analyze?pretty=%s" % PRETTY
+payload = json_text()   # json_data()
 headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-r = requests.post(url, data=payload, headers=headers)
+results = requests.post(url, data=payload, headers=headers)
+
+print(results)
