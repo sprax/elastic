@@ -38,6 +38,14 @@ def json_data_bytes(text=DEFAULT_TEXT, tokenizer="standard", explain=False, enco
     json_byt = bytes(json_str, encoding=encoding)
     return json_byt
 
+# # NOTE: if res_bye.decode('utf-8') fails below, the data may be compressed:
+#     response = opener.open(self.__url, data)
+#     if response.info().get('Content-Encoding') == 'gzip':
+#     buf = StringIO.StringIO( response.read())
+#     gzip_f = gzip.GzipFile(fileobj=buf)
+#     content = gzip_f.read()
+#     else:
+#     content = response.read()
 
 def urllib_request_urlopen_es(payload=None, pretty=PRETTY, text="fishing", verbose=0):
     '''Send request to Elasticsearch using urlopen and return bytes-array results converted to dict'''
