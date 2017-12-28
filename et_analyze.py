@@ -5,6 +5,7 @@ import json
 import requests
 import urllib
 
+HEADERS = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
 PRETTY = "true"
 
 # operations=analyze
@@ -42,9 +43,11 @@ def json_data(query_text=DEFAULT_TEXT, tokenizer="standard", do_explain=False):
     }
     ''' % (query_text, tokenizer, explain)
 
-def json_text(text_to_analyze=DEFAULT_TEXT):
+def json_text_bytes(text_to_analyze=DEFAULT_TEXT, encoding='utf-8'):
     '''no comma after the text'''
-    return "{ \"text\": \"%s\" }" % text_to_analyze
+    json_str = "{ \"text\": \"%s\" }" % text_to_analyze
+    json_byt = bytes(json_str, encoding=encoding)
+    return json_byt
 
 
 # # supply a named analyzer without an index (observe the stemming)
@@ -74,18 +77,8 @@ def json_text(text_to_analyze=DEFAULT_TEXT):
 #
 # For your specific curl translation:
 
-def requests_post_es(payload=None, pretty=PRETTY, verbose=0):
-    '''post request to Elasticsearch'''
-    url = "http://localhost:9200/_analyze?pretty=%s" % pretty
-    payload = payload if payload else json_text()  # json_data()
-    headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-    results = requests.post(url, data=payload, headers=headers)
-    if verbose:
-        print("requests_post_es got results of type(%s): (%s)" % (type(results).__name__, results))
-    return results
-
 def urllib_request_urlopen_es(payload=None, pretty=PRETTY, text="fishing", verbose=0):
-    '''Send request to Elasticsearch using urlopen'''
+    '''Send request to Elasticsearch using urlopen and return bytes-array results converted to dict'''
     # esa_url = r"http://localhost:9200/_analyze?pretty=%s&analyzer=english&text=%s" % (pretty, text)
     esa_url = r"http://localhost:9200"
     res_byt = urllib.request.urlopen(esa_url).read()
@@ -99,22 +92,35 @@ def urllib_request_urlopen_es(payload=None, pretty=PRETTY, text="fishing", verbo
 
 
 def requests_get_es(payload=None, pretty=PRETTY, text="fishing", verbose=0):
-    '''post request to Elasticsearch'''
+    '''post request to Elasticsearch and return JSON results as dict'''
     url = r"http://localhost:9200/_analyze?pretty=%s&analyzer=english&text=%s" % (pretty, text)
     got = requests.get(url)
     if verbose > 0:
         print("requests_get_es got results of type(%s): (%s)" % (type(got).__name__, got))
     return got.json()
 
+def requests_post_es(payload=None, url=r"http://localhost:9200/_analyze", headers=HEADERS, verbose=0):
+    '''post analysis request to Elasticsearch and return JSON results as a dict'''
+    payload = payload if payload else json_text_bytes()  # json_data()
+    results = requests.post(url=url, headers=headers, data=payload)
+    if verbose:
+        print("requests_post_es got results of type(%s): (%s)" % (type(results).__name__, results))
+    return results.json()
 
-post_res = requests_post_es()
-print("requests_post_es results:")
-print(post_res)
-print()
-open_res = urllib_request_urlopen_es()
-print("urllib_request_urlopen_es results:")
-print(open_res)
-print()
-got_json = requests_get_es(verbose=1)
-print("requests_get_es got results with .json() -> dict:")
-print(got_json)
+def main(verbose=1):
+    '''test driver'''
+    open_res = urllib_request_urlopen_es(verbose=verbose)
+    print("urllib_request_urlopen_es results:")
+    print(open_res)
+    print()
+    got_json = requests_get_es(verbose=verbose)
+    print("requests_get_es got results with .json() -> dict:")
+    print(got_json)
+    print()
+    post_res = requests_post_es(verbose=verbose)
+    print("requests_post_es results:")
+    print(post_res)
+    print()
+
+if __name__ == '__main__':
+    main()
