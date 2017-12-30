@@ -21,6 +21,8 @@ def json_text_bytes(text_to_analyze=DEFAULT_TEXT, encoding='utf-8'):
 # NOTES: filters are applied in the order listed, so stemming exceptions (keywords)
 # and overrides must be listed before the stemmer, and overrides that convert other
 # words into to stop words should precede stopword removal.
+# NOTE: https://github.com/elastic/elasticsearch/issues/23943 explains why the following
+# line specifying an anonymous synonym filter is not yet supported:
 #                    {"type": "synonym", "synonyms" : ["ye, hte => the", "angry, furious, mad"]},
 def json_data_bytes(text=DEFAULT_TEXT, tokenizer="standard", explain=False, encoding='utf-8'):
     '''data payload as JSON string'''
