@@ -6,7 +6,8 @@ import pprint
 import requests
 import urllib
 
-DEFAULT_TEXT = "The YeLLoWing café beLLows MiCe were sleeping FURIOUSly."
+ANALYZER_URL = r"http://localhost:9200/_analyze"
+DEFAULT_TEXT = "Ye Olde YeLLoWing café beLLows MiCe were sleeping FURIOUSly."
 HEADERS = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
 PRETTY = "true"
 
@@ -20,6 +21,7 @@ def json_text_bytes(text_to_analyze=DEFAULT_TEXT, encoding='utf-8'):
 # NOTES: filters are applied in the order listed, so stemming exceptions (keywords)
 # and overrides must be listed before the stemmer, and overrides that convert other
 # words into to stop words should precede stopword removal.
+#                    {"type": "synonym", "synonyms" : ["ye, hte => the", "angry, furious, mad"]},
 def json_data_bytes(text=DEFAULT_TEXT, tokenizer="standard", explain=False, encoding='utf-8'):
     '''data payload as JSON string'''
     explain = "true" if explain else "false"
@@ -70,7 +72,7 @@ def requests_get_es(payload=None, text="fishing", verbose=0):
     return got.json()
 
 
-def requests_post_es(payload=None, url=r"http://localhost:9200/_analyze", headers=HEADERS, verbose=0):
+def requests_post_es(payload=None, url=ANALYZER_URL, headers=HEADERS, verbose=0):
     '''post analysis request to Elasticsearch and return JSON results as a dict'''
     payload = payload if payload else json_data_bytes()
     results = requests.post(url=url, headers=headers, data=payload)
