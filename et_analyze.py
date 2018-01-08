@@ -66,7 +66,7 @@ def urllib_request_urlopen_es(payload=None, pretty=PRETTY, text="fishing", verbo
     return res_dct
 
 
-def requests_get_es(payload=None, text="fishing", verbose=0):
+def requests_get_es(text="fishing", verbose=0):
     '''post request to Elasticsearch and return JSON results as dict'''
     url = r"http://localhost:9200/_analyze?analyzer=english&text=%s" % text
     got = requests.get(url)
