@@ -3,8 +3,9 @@
 
 import json
 import pprint
-import requests
 import urllib
+
+import requests
 
 ANALYZER_URL = r"http://localhost:9200/_analyze"
 DEFAULT_TEXT = "Ye Olde YeLLoWing café beLLows MiCe were sleeping FURIOUSly."
@@ -74,8 +75,9 @@ def requests_get_es(payload=None, text="fishing", verbose=0):
     return got.json()
 
 
-def requests_post_es(payload=None, url=ANALYZER_URL, headers=HEADERS, verbose=0):
+def requests_post_es(payload=None, url=ANALYZER_URL, headers=None, verbose=0):
     '''post analysis request to Elasticsearch and return JSON results as a dict'''
+    headers = HEADERS if headers is None else headers
     payload = payload if payload else json_data_bytes()
     results = requests.post(url=url, headers=headers, data=payload)
     if verbose:
