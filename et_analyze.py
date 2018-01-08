@@ -52,7 +52,7 @@ def json_data_bytes(text=DEFAULT_TEXT, tokenizer="standard", explain=False, enco
 #     else:
 #     content = response.read()
 
-def urllib_request_urlopen_es(payload=None, pretty=PRETTY, text="fishing", verbose=0):
+def urllib_request_urlopen_es(verbose=0):
     '''Send request to Elasticsearch using urlopen and return bytes-array results converted to dict'''
     # esa_url = r"http://localhost:9200/_analyze?pretty=%s&analyzer=english&text=%s" % (pretty, text)
     esa_url = r"http://localhost:9200"
@@ -66,9 +66,9 @@ def urllib_request_urlopen_es(payload=None, pretty=PRETTY, text="fishing", verbo
     return res_dct
 
 
-def requests_get_es(text="fishing", verbose=0):
+def requests_get_es(url_fmt=r"http://localhost:9200/_analyze?analyzer=english&text=%s", text="fishing", verbose=0):
     '''post request to Elasticsearch and return JSON results as dict'''
-    url = r"http://localhost:9200/_analyze?analyzer=english&text=%s" % text
+    url = url_fmt % text
     got = requests.get(url)
     if verbose > 0:
         print("requests_get_es got results of type(%s): (%s)" % (type(got).__name__, got))
