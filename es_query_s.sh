@@ -5,7 +5,7 @@ query_type=query_string
 query_term=${1:-opportunity}
 def_field1=${2:-description}
 def_field2=${3:-name}
-def_operat=${4:-AND}
+def_operat=${4:-and}
 analyzer_1=${5:-standard}
 do_explain=${6:-true}
 
@@ -19,13 +19,13 @@ cat <<EOF
             "fields"  : ["$def_field1", "$def_field2"],
             "analyzer": "$analyzer_1",
             "lenient" : "false",
-            "default_operator": "and"
+            "default_operator": "$def_operat"
         }
     },
     "explain" : "$do_explain"
 }
 EOF
-} 
+}
 
 curl "http://localhost:9200/get-together/_search" -d "$(gen_data)"
 
@@ -35,4 +35,3 @@ echo "query_term: $query_term"
 echo "def_field1: $def_field1"
 echo "def_field2: $def_field2"
 echo "analyzer_1: $analyzer_1"
-

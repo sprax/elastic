@@ -96,7 +96,7 @@ def main(verbose=1):
     print()
     post_res = requests_post_es(verbose=verbose)
     print("requests_post_es results:")
-    pprint.pprint(post_res)
+    pprint.pprint(post_res, compact=False)
     print()
 
 if __name__ == '__main__':
